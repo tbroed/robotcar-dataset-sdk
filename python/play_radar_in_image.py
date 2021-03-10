@@ -14,13 +14,14 @@
 
 import argparse
 import os
-from radar import load_radar, radar_polar_to_cartesian, create_radar_point_cloud
+from radar import load_radar, radar_polar_to_cartesian, create_radar_point_cloud, project_image_in_radar
 import numpy as np
 import cv2
 from transform import build_se3_transform
 from image import load_image
 from camera_model import CameraModel
 import matplotlib.pyplot as plt
+
 
 def find_closesd_timestamp(timestamp_path, radar_timestamp):
     # Find fitting radar data
@@ -38,6 +39,7 @@ def find_closesd_timestamp(timestamp_path, radar_timestamp):
 
     return final_timestamp
 
+
 parser = argparse.ArgumentParser(description='Play back radar data from a given directory')
 
 parser.add_argument('dir', type=str, help='Directory containing radar data.')
@@ -49,23 +51,22 @@ args = parser.parse_args()
 
 model = CameraModel(args.models_dir, args.image_dir)
 
-
 timestamps_path = os.path.join(os.path.join(args.dir, os.pardir, 'radar.timestamps'))
 if not os.path.isfile(timestamps_path):
     raise IOError("Could not find timestamps file")
 
 # Cartesian Visualsation Setup
 # Resolution of the cartesian form of the radar scan in metres per pixel
-cart_resolution = .5 #1 #.25
+cart_resolution = .1  # 1 #.25
 # Cartesian visualisation size (used for both height and width)
-cart_pixel_width = 101  # 501 # pixels
+cart_pixel_width = 1001  # 1001 -> 50m ahead # 501 # pixels
 interpolate_crossover = True
 
 title = "Radar Visualisation Example"
 
 radar_timestamps = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)
 cout = 0
-for radar_timestamp in radar_timestamps:
+for radar_timestamp in radar_timestamps[0:]:
     filename = os.path.join(args.dir, str(radar_timestamp) + '.png')
 
     if not os.path.isfile(filename):
@@ -90,7 +91,8 @@ for radar_timestamp in radar_timestamps:
         radar_extrinsics = [float(x) for x in next(radar_extrinsics_file).split(' ')]
     G_posesource_radar = build_se3_transform(radar_extrinsics)
 
-    pointcloud = create_radar_point_cloud(cart_img, G_posesource_radar, radar_timestamp, rel_intesnity_thresh=3, z_value=0)
+    pointcloud = create_radar_point_cloud(cart_img, G_posesource_radar, radar_timestamp, rel_intesnity_thresh=3,
+                                          z_value=0)
 
     # pc = create_radar_point_cloud(cart_img)
 
@@ -106,11 +108,16 @@ for radar_timestamp in radar_timestamps:
 
     uv, depth = model.project(pointcloud, image.shape)
 
-    plt.close("all")
-    plt.imshow(image)
-    plt.scatter(np.ravel(uv[0, :]), np.ravel(uv[1, :]), s=20, c=depth, edgecolors='none', cmap='jet')
-    plt.xlim(0, image.shape[1])
-    plt.ylim(image.shape[0], 0)
-    plt.xticks([])
-    plt.yticks([])
-    plt.savefig("./output/radar_in_image_25_m/img/" + str(radar_timestamp) + ".png")
+    # plt.close("all")
+    # plt.imshow(image)
+    # plt.scatter(np.ravel(uv[0, :]), np.ravel(uv[1, :]), s=20, c=depth, edgecolors='none', cmap='jet')
+    # plt.xlim(0, image.shape[1])
+    # plt.ylim(image.shape[0], 0)
+    # plt.xticks([])
+    # plt.yticks([])
+    # plt.show()
+    # plt.savefig("./output/radar_in_image_25_m/img/" + str(radar_timestamp) + ".png")
+
+    project_image_in_radar(radar_timestamp, cart_img, image, model, target_dim=(cart_pixel_width - 1) / 2,
+                           scale=cart_resolution,
+                           show=False, save=True)
