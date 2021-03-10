@@ -16,8 +16,11 @@ from typing import AnyStr, Tuple
 import numpy as np
 import cv2
 import math
+
+from scipy import ndimage
 from skimage.feature import peak_local_max
 import matplotlib.pyplot as plt
+import utils.ipm.utils as ipm_util
 
 
 def load_radar(example_path: AnyStr) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float]:
@@ -176,7 +179,8 @@ def radar_to_radar_peaks(radar_cartesian, radar_timestamp, rel_intesnity_thresh=
     plt.close("all")
     plt.imshow(radar_cartesian)  # , cmap=plt.cm.gray)
     plt.plot(radar_peaks_coordinates[:, 1], radar_peaks_coordinates[:, 0], 'r.')
-    plt.savefig("output/radar_in_image_25_m/cart/" + str(radar_timestamp) + ".png")
+    # plt.show()
+    # plt.savefig("output/radar_in_image_25_m/cart/" + str(radar_timestamp) + ".png")
     radar_pc = np.zeros((radar_peaks_coordinates.shape[0], 2))
     for i, coord in enumerate(radar_peaks_coordinates):
         radar_pc[i] = [coord[1], coord[0]]
@@ -188,3 +192,52 @@ def pol2cart(rho, phi):
     x = rho * math.cos(math.radians(phi))
     y = rho * math.sin(math.radians(phi))
     return (x, y)
+
+def project_image_in_radar(radar_timestamp, cart_img, image, model , target_dim=500, scale=0.1, save=None, show=None):
+    target_dim = int(target_dim)
+    TARGET_H, TARGET_W = target_dim, target_dim
+
+    # Camera extrinsics left wide
+    x, y, z, r, p, y = 0, 0, 1.52, 0, 0.05, 0
+
+    R_veh2cam = np.transpose(ipm_util.rotation_from_euler(r, p, y))
+    T_veh2cam = ipm_util.translation_matrix((-x, -y, -z))
+    # Rotate to camera coodinates
+    R = np.transpose(np.array([[0., 0., 1., 0.],
+                               [1., 0., 0., 0.],
+                               [0., -1., 0., 0.],
+                               [0., 0., 0., 1.]]))
+    RT = R @ R_veh2cam @ T_veh2cam
+    extrinsic = RT
+
+    # Define the plane on the region of interest (road)
+    plane = ipm_util.Plane(0, -(0.1 * TARGET_H / 2), 0, 0, 0, 0, TARGET_H, TARGET_W, scale)
+    # Resolution: 0.1m per pixel
+
+    fx, fy = model.focal_length
+    u0, v0 = model.principal_point
+
+    # Intrinsic
+    K = np.array([[fx, 0, u0, 0],
+                  [0, fy, v0, 0],
+                  [0, 0, 1, 0],
+                  [0, 0, 0, 1]])
+    intrinsics = K
+
+    warped1 = ipm_util.ipm_from_parameters(image, plane.xyz, intrinsics, extrinsic, TARGET_H, TARGET_W)
+    rotated_img = ndimage.rotate(warped1, 90)
+
+
+    # create overlay and safe it to output
+    plt.close("all")
+    plt.imshow(cart_img / cart_img.max())
+    zeros = np.zeros([np.shape(cart_img)[0], np.shape(cart_img)[1], 3])
+    overlay_shape = rotated_img.shape
+    x_start = np.int((np.shape(cart_img)[0] - rotated_img.shape[0]) / 2)
+    y_start = np.int((np.shape(cart_img)[1] - rotated_img.shape[1]) / 2)
+    zeros[:overlay_shape[0], y_start:overlay_shape[1] + y_start, :] = rotated_img / 255
+    plt.imshow(zeros, alpha=0.7)
+    if show==True:
+        plt.show()
+    if save==True:
+        plt.savefig("output/image_in_radar_100m/" + str(radar_timestamp) + ".png")
