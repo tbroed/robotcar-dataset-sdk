@@ -15,6 +15,9 @@
 from typing import AnyStr, Tuple
 import numpy as np
 import cv2
+import math
+from skimage.feature import peak_local_max
+import matplotlib.pyplot as plt
 
 
 def load_radar(example_path: AnyStr) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float]:
@@ -142,3 +145,46 @@ def radar_polar_to_cartesian(azimuths: np.ndarray, fft_data: np.ndarray, radar_r
     polar_to_cart_warp = np.stack((sample_u, sample_v), -1)
     cart_img = np.expand_dims(cv2.remap(fft_data, polar_to_cart_warp, None, cv2.INTER_LINEAR), -1)
     return cart_img
+
+
+def create_radar_point_cloud(radar_img, G_posesource_radar, radar_timestamp, rel_intesnity_thresh=5,
+                             z_value=-0.45):  # , radar_cartesian, intesnity_thresh):
+    radar_peaks = radar_to_radar_peaks(radar_img, radar_timestamp, rel_intesnity_thresh=rel_intesnity_thresh)
+    shape = radar_img.shape
+    radar_pc = np.array([[0], [0], [0], [0]])
+    for peak in radar_peaks:
+        # X forward; Y to the right; Z downwards
+        x = ((shape[1] / 2) - peak[1]) / 2
+        y = -((shape[0] / 2) - peak[0]) / 2
+        z = z_value
+        reflectance = 1
+        if x > 0:
+            scan = np.dot(G_posesource_radar, np.array([[x], [y], [z], [reflectance]]))
+            radar_pc = np.hstack([radar_pc, scan])
+    radar_pc = radar_pc[:, 1:]
+    return radar_pc
+
+
+def radar_to_radar_peaks(radar_cartesian, radar_timestamp, rel_intesnity_thresh=5):
+    # detected_points = cfar2d(radar_cartesian, 10, 4, 0.5)
+    # radar_pc should be a point cloud with shape Nx5 (x,y,z,intensity,ring)
+    mean = np.mean(radar_cartesian)
+    std = np.std(radar_cartesian)
+    radar_peaks_coordinates = peak_local_max(radar_cartesian[:, :, 0], min_distance=1,
+                                             threshold_abs=mean + (rel_intesnity_thresh * std))
+    # radar_peaks = detect_peaks(radar_cartesian)
+    plt.close("all")
+    plt.imshow(radar_cartesian)  # , cmap=plt.cm.gray)
+    plt.plot(radar_peaks_coordinates[:, 1], radar_peaks_coordinates[:, 0], 'r.')
+    plt.savefig("output/radar_in_image_25_m/cart/" + str(radar_timestamp) + ".png")
+    radar_pc = np.zeros((radar_peaks_coordinates.shape[0], 2))
+    for i, coord in enumerate(radar_peaks_coordinates):
+        radar_pc[i] = [coord[1], coord[0]]
+
+    return radar_pc
+
+
+def pol2cart(rho, phi):
+    x = rho * math.cos(math.radians(phi))
+    y = rho * math.sin(math.radians(phi))
+    return (x, y)
