@@ -46,6 +46,7 @@ parser.add_argument('dir', type=str, help='Directory containing radar data.')
 parser.add_argument('--image_dir', type=str, help='Directory containing images')
 parser.add_argument('--models_dir', type=str, help='Directory containing camera models')
 parser.add_argument('--extrinsics_dir', type=str, help='Directory containing sensor extrinsics')
+parser.add_argument('--overlay_segmentation_masks', action='store_true', default=False, help='Use pre segmented image to overlay')
 
 args = parser.parse_args()
 
@@ -118,6 +119,16 @@ for radar_timestamp in radar_timestamps[0:]:
     # plt.show()
     # plt.savefig("./output/radar_in_image_25_m/img/" + str(radar_timestamp) + ".png")
 
-    project_image_in_radar(radar_timestamp, cart_img, image, model, target_dim=(cart_pixel_width - 1) / 2,
+    if args.overlay_segmentation_masks:
+        from PIL import Image
+        image_path = "segmentations/output_stereo_ResNeSt_small/" + str(image_timestamp) + ".png"
+        seg_image = Image.open(image_path).convert("RGB")
+        # seg_image = load_image(image_path, model)
+        seg_image = np.array(seg_image.resize((1280, 960)))
+        project_image_in_radar(image_timestamp, cart_img, image, model, target_dim=(cart_pixel_width - 1) / 2,
+                               scale=cart_resolution,
+                               show=False, save=True)
+    else:
+        project_image_in_radar(radar_timestamp, cart_img, image, model, target_dim=(cart_pixel_width - 1) / 2,
                            scale=cart_resolution,
                            show=False, save=True)
