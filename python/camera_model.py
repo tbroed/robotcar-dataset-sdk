@@ -51,7 +51,7 @@ class CameraModel:
         self.__load_intrinsics(models_dir, images_dir)
         self.__load_lut(models_dir, images_dir)
 
-    def project(self, xyz, image_size):
+    def project(self, xyz, image_size, return_pc=False):
         """Projects a pointcloud into the camera using a pinhole camera model.
 
         Args:
@@ -74,6 +74,7 @@ class CameraModel:
         # Find which points lie in front of the camera
         in_front = [i for i in range(0, xyzw.shape[1]) if xyzw[2, i] >= 0]
         xyzw = xyzw[:, in_front]
+        pc_return = xyz[:, in_front]
 
         uv = np.vstack((self.focal_length[0] * xyzw[0, :] / xyzw[2, :] + self.principal_point[0],
                         self.focal_length[1] * xyzw[1, :] / xyzw[2, :] + self.principal_point[1]))
@@ -81,7 +82,10 @@ class CameraModel:
         in_img = [i for i in range(0, uv.shape[1])
                   if 0.5 <= uv[0, i] <= image_size[1] and 0.5 <= uv[1, i] <= image_size[0]]
 
-        return uv[:, in_img], np.ravel(xyzw[2, in_img])
+        if return_pc:
+            return uv[:, in_img], np.ravel(xyzw[2, in_img]), pc_return[:, in_img]
+        else:
+            return uv[:, in_img], np.ravel(xyzw[2, in_img])
 
     def undistort(self, image):
         """Undistorts an image.
