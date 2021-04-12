@@ -102,6 +102,31 @@ def do_icp(source, target, trans_init, threshold=0.02, verbose=0):
     return reg_p2l
 
 
+def filter_pcl(pcl, filter_ego_vehicle=True, min_threshold=2.5, max_range=50, ground_level=2.5, reduce=False):
+    # only keep point within the thresholds
+    # reduce only keeps random 10% of the point clouds
+    list_of_valid_points = []
+    for i in range(pcl.shape[1]):
+        if reduce:
+            if np.random.rand() > 0.1:
+                continue
+        point = pcl[:, i]
+        distance = LA.norm(point)
+        reject_point = False
+        if filter_ego_vehicle:
+            if distance < min_threshold:
+                # TODO: make box not circle
+                reject_point = True
+        if distance > max_range:
+            reject_point = True
+        if point[2] > ground_level:
+            reject_point = True
+        if not reject_point:
+            list_of_valid_points.append(i)
+    filtered_pcl = pcl[:, [list_of_valid_points]][:, 0, :]
+    return filtered_pcl
+
+
 def get_single_pc(lidar_dir, start_time):
     scan_path = os.path.join(lidar_dir, str(start_time) + '.bin')
     if os.path.isfile(scan_path):
