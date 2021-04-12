@@ -26,6 +26,16 @@ def display_single_pc(pointcloud):
     vis.run()
 
 
+def accumulate_poses(relative_poses):
+    absolute_poses = []
+    previous_pose = np.identity(4)
+    for pose in relative_poses:
+        absolute_pose = np.dot(previous_pose, pose)
+        absolute_poses.append(absolute_pose)
+        previous_pose = absolute_pose
+    return absolute_poses
+
+
 def get_point_clouds(args, use_all=True):
     lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', args.laser_dir).group(0)
     timestamps_path = os.path.join(args.laser_dir, os.pardir, lidar + '.timestamps')
