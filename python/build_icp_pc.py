@@ -138,13 +138,8 @@ def get_single_pc(lidar_dir, start_time):
         ranges, intensities, angles, approximate_timestamps = load_velodyne_raw(scan_path)
         ptcld = velodyne_raw_to_pointcloud(ranges, intensities, angles)
     scan = ptcld[:3]
-
-    # scan = np.dot(np.dot(poses[0], G_posesource_laser), np.vstack([scan, np.ones((1, scan.shape[1]))]))
-    # pointcloud = np.hstack([pointcloud, scan])
-    #
-    # pointcloud = pointcloud[:, 1:]
-    # if pointcloud.shape[1] == 0:
-    #     raise IOError("Could not find scan files for given time range in directory " + lidar_dir)
+    scan = filter_pcl(scan, filter_ego_vehicle=True, min_threshold=2.5, max_range=50, ground_level=2.5, reduce=False)
+    return scan
 
     return scan  # pointcloud, reflectance
 
