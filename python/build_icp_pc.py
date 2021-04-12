@@ -32,7 +32,7 @@ def get_point_clouds(args, use_all=True):
     if use_all:
         timestamps = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)
     else:
-        timestamps = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)[:200]
+        timestamps = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)[200:400][::10]
     timestamps = timestamps.tolist()
 
     origin_time = int(timestamps[0])
