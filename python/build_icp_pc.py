@@ -260,7 +260,11 @@ def downsample_pcl(pcl, rate):
 
 
 if __name__ == "__main__":
-    target_num = 10
+    down_sample_rate = 10
+    display_result = True
+    use_all_points = False
+    save_result = False
+    save_result_name = "output/Point_Clouds/pc_test.ply"
 
     parser = argparse.ArgumentParser(description='Build and display a pointcloud')
     parser.add_argument('--poses_file', type=str, default=None, help='File containing relative or absolute poses')
@@ -269,30 +273,19 @@ if __name__ == "__main__":
                         help='Directory containing extrinsic calibrations')
     parser.add_argument('--image_dir', type=str, help='Directory containing images')
     parser.add_argument('--models_dir', type=str, help='Directory containing camera models')
-
     args = parser.parse_args()
 
-    point_clouds, poses = get_point_clouds(args, use_all=False)
-
+    point_clouds, poses = get_point_clouds(args, use_all=use_all_points)
     point_cloud = combine_point_clouds(point_clouds, poses)
 
-    o3d.io.write_point_cloud("output/Point_Clouds/pc_all_icp_vo.ply", point_cloud)
+    if save_result:
+        o3d.io.write_point_cloud(save_result_name, point_cloud)
+    if down_sample_rate > 0:
+        point_cloud = downsample_pcl(point_cloud, rate=down_sample_rate)
+    if display_result:
+        display_single_pc(point_cloud)
 
-    display_single_pc(point_cloud)
-
-
-    # visualize_list_of_pc(point_clouds, optimized_relative_poses)
-
-    # # visualize v0/gps difference
-    # draw_registration_result(o3d.io.read_point_cloud("output/Point_Clouds/pc_all_vo.ply"),
-    #                          o3d.io.read_point_cloud("output/Point_Clouds/pc_all_gps.ply"),
-    #                          np.identity(4))
-
-
-
-    print("hier")
     # TODO: build_pose_graph()
     # TODO: do_graph_optimization()
-    # build_lidar_map(point_clouds,pc_transformation)
-    # save_map()
-    # display_pc()
+
+    print("finished")
