@@ -12,11 +12,11 @@ from numpy import linalg as LA
 
 
 def init_visualizer():
-    vis = o3d.Visualizer()
+    vis = o3d.visualization.Visualizer()
     vis.create_window(window_name=os.path.basename(__file__))
     render_option = vis.get_render_option()
     render_option.background_color = np.array([0.1529, 0.1569, 0.1333], np.float32)
-    render_option.point_color_option = o3d.PointColorOption.Default
+    render_option.point_color_option = o3d.visualization.PointColorOption.Default
     return vis
 
 
@@ -81,19 +81,19 @@ def do_icp(source, target, trans_init, threshold=0.02, verbose=0):
             source, target, threshold, trans_init)
         print(evaluation)
 
-    reg_p2l = o3d.open3d.registration.registration_icp(
+    reg_p2l = o3d.pipelines.registration.registration_icp(
         source, target, threshold, trans_init,
-        o3d.open3d.registration.TransformationEstimationPointToPlane())
+        o3d.pipelines.registration.TransformationEstimationPointToPlane())
 
-    # reg_p2l = o3d.open3d.registration.registration_icp(
+    # reg_p2l = o3d.pipelines.registration.registration_icp(
     #     source, target, threshold, trans_init,
-    #     o3d.open3d.registration.TransformationEstimationPointToPoint(),
-    #     o3d.open3d.registration.ICPConvergenceCriteria(max_iteration=2000))
+    #     o3d.pipelines.registration.TransformationEstimationPointToPoint(),
+    #     o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=2000))
 
     # mu, sigma = 0, 0.1  # mean and standard deviation
-    # loss = o3d.open3d.registration.TukeyLoss(k=sigma)
-    # p2l = o3d.open3d.registration.TransformationEstimationPointToPlane(loss)
-    # reg_p2l = o3d.open3d.registration.registration_icp(source, target,
+    # loss = o3d.pipelines.registration.TukeyLoss(k=sigma)
+    # p2l = o3d.pipelines.registration.TransformationEstimationPointToPlane(loss)
+    # reg_p2l = o3d.pipelines.registration.registration_icp(source, target,
     #                                                       threshold, trans_init,
     #                                                       p2l)
 
