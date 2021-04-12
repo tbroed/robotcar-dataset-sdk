@@ -141,20 +141,27 @@ def get_single_pc(lidar_dir, start_time):
     scan = filter_pcl(scan, filter_ego_vehicle=True, min_threshold=2.5, max_range=50, ground_level=2.5, reduce=False)
     return scan
 
-    return scan  # pointcloud, reflectance
 
-
-def optimize_with_icp(point_clouds, point_clouds_relative_poses):
-    point_clouds_icp_optimized_poses = []
-    point_clouds_icp_optimized_poses.append(np.identity(4))
+def optimize_with_icp(point_clouds, poses_initial_guess, timestamps):
+    point_clouds_icp_optimized_poses = [np.identity(4)]
     for i in range(1, len(point_clouds)):
         if i % 100 is 0:
             print("icp iteration: ", i)
         target = point_clouds[i - 1]
         source = point_clouds[i]
-        trans_init = point_clouds_relative_poses[i - 1]  # does not have an entry for the first pc
-        opt_pose = do_icp(source, target, trans_init, threshold=0.2)
-        point_clouds_icp_optimized_poses.append(opt_pose.transformation)
+
+        # define entries for get_icp_transform
+        src_pcl = np.array(source.points)
+        dst_pcl = np.array(target.points)
+        src_pose = poses_initial_guess[i]
+        dst_pose = poses_initial_guess[i - 1]
+        src_ts = timestamps[i]
+        dst_ts = timestamps[i - 1]
+        tmat, cc, fitness = get_icp_transform(src_pcl, dst_pcl,
+                                              src_pose, dst_pose,
+                                              src_ts, dst_ts, verbose=False)
+        # TODO: save to file to accumulate later
+        point_clouds_icp_optimized_poses.append(tmat)
     return point_clouds_icp_optimized_poses
 
 
