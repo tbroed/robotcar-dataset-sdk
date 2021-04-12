@@ -3,12 +3,12 @@ import argparse
 import os
 import re
 import numpy as np
-from build_pointcloud import build_pointcloud
+from python.files_mapping.icp import get_icp_transform
 from transform import build_se3_transform
 from interpolate_poses import interpolate_vo_poses, interpolate_ins_poses
 from velodyne import load_velodyne_raw, load_velodyne_binary, velodyne_raw_to_pointcloud
 import copy
-from open3d.open3d.geometry import estimate_normals
+from numpy import linalg as LA
 
 
 def init_visualizer():
