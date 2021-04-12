@@ -241,37 +241,22 @@ def combine_point_clouds(point_clouds, poses):
     # display_single_pc(combined_pcd)
     return combined_pcd
 
-def test_icp_with_two_timestemps(args, timestamps, poses):
-    timestamp_target = int(timestamps[0])
-    timestamp_source = int(timestamps[target_num])
 
-    # TODO: do for 1. and 3. -> display -> do ICP -> display
-
-    pointcloud_source = get_single_pc(args.laser_dir, timestamp_source)
-    pcd_source = o3d.geometry.PointCloud()
-    pcd_source.points = o3d.utility.Vector3dVector(
-        -np.ascontiguousarray(pointcloud_source.transpose().astype(np.float64)))
-    # display_single_pc(pcd_source)
-
-    pointcloud_target = get_single_pc(args.laser_dir, timestamp_target)
-    pcd_target = o3d.geometry.PointCloud()
-    pcd_target.points = o3d.utility.Vector3dVector(
-        -np.ascontiguousarray(pointcloud_target.transpose().astype(np.float64)))
-    # display_single_pc(pcd_target)
-    #
-    #
-    rel_pose = np.dot(inverse_transformation(poses[0]), poses[target_num])
-    draw_registration_result(pcd_source, pcd_target, rel_pose)
-
-    # pcd_source.estimate_normals(
-    #     o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
-    # pcd_target.estimate_normals(
-    #     o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
-    estimate_normals(pcd_source, search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=1, max_nn=30))
-    estimate_normals(pcd_target, search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=1, max_nn=30))
-    refined_transformation = do_icp(pcd_source, pcd_target, rel_pose, threshold=0.2, verbose=1)
-    print("difference due to icp ", rel_pose - refined_transformation.transformation)
-    draw_registration_result(pcd_source, pcd_target, refined_transformation.transformation)
+def downsample_pcl(pcl, rate):
+    # reduces point cloud by the rate
+    rate = 1./rate
+    points = pcl.points
+    points_np = np.array(points)
+    size = points_np.shape[0]
+    sample = np.random.rand(size)
+    keep = sample < rate
+    sampled_points = points_np[keep]
+    pcl.points = o3d.utility.Vector3dVector(sampled_points)
+    if pcl.has_normals():
+        pcl.normals = pcl.normals[keep]
+    if pcl.has_colors():
+        pcl.colors = pcl.colors[keep]
+    return pcl
 
 
 if __name__ == "__main__":
