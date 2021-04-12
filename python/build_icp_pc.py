@@ -55,10 +55,7 @@ def get_point_clouds(args, use_all=True):
 
     timestamps = timestamps[1:]  # delete the added (in get_poses and more down in the code) origin timestamp again
 
-    # test_icp_with_two_timestemps(args, timestamps, poses)
-
     point_clouds = []
-    point_clouds_relative_poses = []
     for i, timestamp in enumerate(timestamps):
         if i % 100 is 0:
             print("iteration: ", i)
@@ -66,22 +63,12 @@ def get_point_clouds(args, use_all=True):
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(
             -np.ascontiguousarray(pc.transpose().astype(np.float64)))
-        estimate_normals(pcd)#, search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=1, max_nn=30))
         point_clouds.append(pcd)
-        if i > 0:
-            relative_pose = np.dot(inverse_transformation(poses[i - 1]), poses[i])
-            point_clouds_relative_poses.append(relative_pose)
 
-    optimized_relative_poses = optimize_with_icp(point_clouds, point_clouds_relative_poses)
+    optimized_relative_poses = optimize_with_icp(point_clouds, poses, timestamps)
+    optimized_absolute_poses = accumulate_poses(optimized_relative_poses)
 
-    optimized_absolute_poses = []
-    previous_pose = np.identity(4)
-    for pose in optimized_relative_poses:
-        absolute_pose = np.dot(previous_pose, pose)
-        optimized_absolute_poses.append(absolute_pose)
-        previous_pose = absolute_pose
-
-    return point_clouds, optimized_absolute_poses #TODO: change back to optimized_relative_poses
+    return point_clouds, optimized_absolute_poses
 
 
 def do_icp(source, target, trans_init, threshold=0.02, verbose=0):
