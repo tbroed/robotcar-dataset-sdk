@@ -319,7 +319,7 @@ if __name__ == "__main__":
     if build_graph:
         # TODO: build_pose_graph()
         pgo = build_pose_graph(poses)
-        pgo.visualize_in_plt(dreiD=True)
+        pgo.visualize_in_plt(threeDim=True)
 
         # TODO: do_graph_optimization()
         print('Performing full BA:')

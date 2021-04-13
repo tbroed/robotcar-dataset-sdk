@@ -1,7 +1,8 @@
 import g2o
 import numpy as np
+import matplotlib.pyplot as plt
 
-from hd_map.common.meshlab import MeshlabInf
+# from hd_map.common.meshlab import MeshlabInf
 
 
 class PoseGraphOptimization(g2o.SparseOptimizer):
@@ -39,7 +40,7 @@ class PoseGraphOptimization(g2o.SparseOptimizer):
         super().add_vertex(v_point)
 
     def add_edge(self, vertices, measurement, information=np.eye(6), robust_kernel=None):
-        self.edge_vertices.add(vertices)
+        # self.edge_vertices.add(vertices) # TODO: was soll das bringen?
 
         edge = g2o.EdgeSE3()
         for i, v in enumerate(vertices):
@@ -100,3 +101,45 @@ class PoseGraphOptimization(g2o.SparseOptimizer):
         for edge in self.edge_vertices:
             meshlab.add_line(points[edge[0]], points[edge[1]])
         meshlab.write(filename)
+
+
+    def visualize_in_plt(self, threeDim = False):
+        points = {}
+        for vertex_id, vertex in self.vertices().items():
+            if isinstance(vertex, g2o.VertexSE3):
+                points[vertex_id] = vertex.estimate().matrix()[:3, 3]
+        x = []
+        y = []
+        z = []
+        for i in range(len(points)):
+            x.append(points[i][0])
+            y.append(points[i][1])
+            z.append(points[i][2])
+
+        fig = plt.figure()
+        if threeDim:
+            ax = fig.gca(projection='3d')
+            ax.plot(x, y, z)
+            # Plot scatterplot data (20 2D points per colour) on the x and z axes.
+            c_list = np.linspace(0, 1, len(points))
+            # By using zdir='y', the y value of these points is fixed to the zs value 0
+            # and the (x,y) points are plotted on the x and z axes.
+            ax.scatter(x, y, z, c=c_list, label='points in (x,z)')
+
+            # # Make legend, set axes limits and labels
+            # ax.legend()
+            # ax.set_xlim(0, 1)
+            # ax.set_ylim(0, 1)
+            # ax.set_zlim(0, 1)
+            # ax.set_xlabel('X')
+            # ax.set_ylabel('Y')
+            # ax.set_zlabel('Z')
+            #
+            # # Customize the view angle so it's easier to see that the scatter points lie
+            # # on the plane y=0
+            # ax.view_init(elev=20., azim=-35)
+        else:
+            plt.plot(x, y)
+            c_list = np.linspace(0, 1, len(points))
+            plt.scatter(x, y, c=c_list, label='points in (x,z)')
+        plt.show()
