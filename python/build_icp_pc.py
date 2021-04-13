@@ -4,6 +4,7 @@ import os
 import re
 import numpy as np
 from python.files_mapping.icp import get_icp_transform
+from python.files_mapping.pose_graph_optimization import PoseGraphOptimization
 from transform import build_se3_transform
 from interpolate_poses import interpolate_vo_poses, interpolate_ins_poses
 from velodyne import load_velodyne_raw, load_velodyne_binary, velodyne_raw_to_pointcloud
@@ -36,13 +37,13 @@ def accumulate_poses(relative_poses):
     return absolute_poses
 
 
-def get_point_clouds(args, use_all=True):
+def get_point_clouds(args, use_all=True, start_ts=None, end_ts=None, stride=None):
     lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', args.laser_dir).group(0)
     timestamps_path = os.path.join(args.laser_dir, os.pardir, lidar + '.timestamps')
     if use_all:
         timestamps = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)
     else:
-        timestamps = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)[200:400][::10]
+        timestamps = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)[start_ts:end_ts][::stride]
     timestamps = timestamps.tolist()
 
     origin_time = int(timestamps[0])
@@ -213,21 +214,20 @@ def inverse_transformation(matrix):
     return inverse
 
 
-
-
 def visualize_list_of_pc(point_clouds, optimized_relative_poses):
+    # displays individual point clouds with their respective relative poses
     vis = init_visualizer()
     optimized_absolute_poses = []
     previous_pose = np.identity(4)
     for pose in optimized_relative_poses:
         absolute_pose = np.dot(previous_pose, pose)
         optimized_absolute_poses.append(absolute_pose)
-
-    for i,pc in enumerate(point_clouds):
+    for i, pc in enumerate(point_clouds):
         pc_temp = copy.deepcopy(pc)
         pc_temp.transform(optimized_absolute_poses[i])
         vis.add_geometry(pc_temp)
     vis.run()
+
 
 def combine_point_clouds(point_clouds, poses):
     combined_pcd = o3d.geometry.PointCloud()
@@ -242,9 +242,23 @@ def combine_point_clouds(point_clouds, poses):
     return combined_pcd
 
 
+def build_pose_graph(poses):
+    pgo = PoseGraphOptimization()
+    for i, pose in enumerate(poses):
+        if i is 0:
+            pgo.add_vertex(i, pose, fixed=True)
+        else:
+            pgo.add_vertex(i, pose)
+            relative_pose = np.dot(inverse_transformation(poses[i - 1]), poses[i])
+            pgo.add_edge([i, i - 1], relative_pose)
+        last = i
+    # pgo.add_edge([last, 0], np.identity(4)) # forces a closure at the end
+    return pgo
+
+
 def downsample_pcl(pcl, rate):
     # reduces point cloud by the rate
-    rate = 1./rate
+    rate = 1. / rate
     points = pcl.points
     points_np = np.array(points)
     size = points_np.shape[0]
@@ -260,11 +274,19 @@ def downsample_pcl(pcl, rate):
 
 
 if __name__ == "__main__":
-    down_sample_rate = 10
+    down_sample_rate = 5
     display_result = True
     use_all_points = False
+    start_ts = 32750
+    end_ts = 33800
+    stride = 20
     save_result = False
-    save_result_name = "output/Point_Clouds/pc_test.ply"
+    save_result_name = "output/Point_Clouds/pc_test_circle.ply"
+    build_graph = True
+    save_poses = True
+    save_poses_name = 'test.npy'
+    load_poses = True
+    load_poses_name = 'poses_gps_circle_32750_33800_20.npy'
 
     parser = argparse.ArgumentParser(description='Build and display a pointcloud')
     parser.add_argument('--poses_file', type=str, default=None, help='File containing relative or absolute poses')
@@ -274,18 +296,34 @@ if __name__ == "__main__":
     parser.add_argument('--image_dir', type=str, help='Directory containing images')
     parser.add_argument('--models_dir', type=str, help='Directory containing camera models')
     args = parser.parse_args()
+    if not load_poses:
+        if not use_all_points:
+            point_clouds, poses = get_point_clouds(args, use_all=use_all_points, start_ts=start_ts, end_ts=end_ts,
+                                                   stride=stride)
+        else:
+            point_clouds, poses = get_point_clouds(args)
+        point_cloud = combine_point_clouds(point_clouds, poses)
 
-    point_clouds, poses = get_point_clouds(args, use_all=use_all_points)
-    point_cloud = combine_point_clouds(point_clouds, poses)
+        if save_result:
+            o3d.io.write_point_cloud(save_result_name, point_cloud)
+        if down_sample_rate > 0:
+            point_cloud = downsample_pcl(point_cloud, rate=down_sample_rate)
+        if display_result:
+            display_single_pc(point_cloud)
+        if save_poses:
+            poses_np = np.array(poses)
+            np.save(save_poses_name, poses_np)
+    else:
+        poses_np = np.load(load_poses_name)
+        poses = poses_np
+    if build_graph:
+        # TODO: build_pose_graph()
+        pgo = build_pose_graph(poses)
+        pgo.visualize_in_plt(dreiD=True)
 
-    if save_result:
-        o3d.io.write_point_cloud(save_result_name, point_cloud)
-    if down_sample_rate > 0:
-        point_cloud = downsample_pcl(point_cloud, rate=down_sample_rate)
-    if display_result:
-        display_single_pc(point_cloud)
-
-    # TODO: build_pose_graph()
-    # TODO: do_graph_optimization()
+        # TODO: do_graph_optimization()
+        print('Performing full BA:')
+        pgo.optimize(max_iterations=20, verbose=True)
+        pgo.visualize_in_plt()
 
     print("finished")
