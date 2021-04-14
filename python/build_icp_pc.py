@@ -392,7 +392,7 @@ if __name__ == "__main__":
 
         # TODO: do_graph_optimization()
         print('Performing full BA:')
-        pgo.optimize(max_iterations=20, verbose=True)
+        pgo.optimize(max_iterations=20)
         pgo.visualize_in_plt()
 
     print("finished")
