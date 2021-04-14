@@ -242,7 +242,7 @@ def build_pose_graph(poses):
         else:
             pgo.add_vertex(i, pose)
             relative_pose = np.dot(inverse_transformation(poses[i - 1]), poses[i])
-            pgo.add_edge([i, i - 1], relative_pose)
+            pgo.add_edge([i - 1, i], relative_pose)
         last = i
     # pgo.add_edge([last, 0], np.identity(4)) # forces a closure at the end
     return pgo
