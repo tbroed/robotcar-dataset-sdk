@@ -37,17 +37,9 @@ def accumulate_poses(relative_poses):
     return absolute_poses
 
 
-def get_point_clouds(args, use_all=True, start_ts=None, end_ts=None, stride=None):
-    lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', args.laser_dir).group(0)
-    timestamps_path = os.path.join(args.laser_dir, os.pardir, lidar + '.timestamps')
-    if use_all:
-        timestamps = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)
-    else:
-        timestamps = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)[start_ts:end_ts][::stride]
-    timestamps = timestamps.tolist()
-
+def get_point_clouds(args, timestamps):
     origin_time = int(timestamps[0])
-
+    lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', args.laser_dir).group(0)
     with open(os.path.join(args.extrinsics_dir, lidar + '.txt')) as extrinsics_file:
         extrinsics = next(extrinsics_file)
     G_posesource_laser = build_se3_transform([float(x) for x in extrinsics.split(' ')])
