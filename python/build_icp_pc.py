@@ -340,9 +340,10 @@ if __name__ == "__main__":
     use_all_points = False
     start_ts = 32750
     end_ts = 33800
-    stride = 20
-    save_result = False
-    save_result_name = "output/Point_Clouds/pc_test_circle.ply"
+    stride = 5
+    save_result = True
+    save_result_name = "output/Point_Clouds/pc_g2o_before_stirde_5.ply"
+    save_result_name_graph_optimized = "output/Point_Clouds/pc_g2o_stirde_5.ply"
     build_graph = True
     save_poses = True
     save_poses_name = 'test.npy'
@@ -379,7 +380,6 @@ if __name__ == "__main__":
         poses_np = np.load(load_poses_name)
         poses = poses_np
     if build_graph:
-        # TODO: build_pose_graph()
         pgo = build_pose_graph(poses)
 
         # Build KD Tree and find loop closures
@@ -390,18 +390,21 @@ if __name__ == "__main__":
         # visualize before refinment
         pgo.visualize_in_plt()
 
-        # TODO: do_graph_optimization()
+        # Do graph optimization
         print('Performing full BA:')
         pgo.optimize(max_iterations=20)
         pgo.visualize_in_plt()
 
-        # visualize and save optimized point cloud
-        pgo_poses = []
-        for i in range(len(pgo.vertices())):
-            pgo_poses.append(pgo.vertex(i).estimate().matrix())
-        point_cloud = combine_point_clouds(point_clouds, pgo_poses)
-        if down_sample_rate > 0:
-            point_cloud = downsample_pcl(point_cloud, rate=down_sample_rate)
-        o3d.io.write_point_cloud("output/Point_Clouds/pc_g2o_stirde_5.ply", point_cloud)
-        display_single_pc(point_cloud)
+        if display_result or save_result:
+            # visualize and save optimized point cloud
+            pgo_poses = []
+            for i in range(len(pgo.vertices())):
+                pgo_poses.append(pgo.vertex(i).estimate().matrix())
+            point_cloud = combine_point_clouds(point_clouds, pgo_poses)
+            if down_sample_rate > 0:
+                point_cloud = downsample_pcl(point_cloud, rate=down_sample_rate)
+            if save_result:
+                o3d.io.write_point_cloud(save_result_name_graph_optimized, point_cloud)
+            if display_result:
+                display_single_pc(point_cloud)
     print("finished")
