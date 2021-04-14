@@ -356,6 +356,7 @@ if __name__ == "__main__":
                         help='Directory containing extrinsic calibrations')
     parser.add_argument('--image_dir', type=str, help='Directory containing images')
     parser.add_argument('--models_dir', type=str, help='Directory containing camera models')
+    parser.add_argument('--gps_file', type=str, help='File containing gps poses')
     args = parser.parse_args()
     if not load_poses:
         if not use_all_points:
