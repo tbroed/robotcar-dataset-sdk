@@ -265,6 +265,75 @@ def downsample_pcl(pcl, rate):
     return pcl
 
 
+def build_KD_Tree(args, timestamps):
+    origin_time = int(timestamps[0])
+    lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', args.laser_dir).group(0)
+    with open(os.path.join(args.extrinsics_dir, lidar + '.txt')) as extrinsics_file:
+        extrinsics = next(extrinsics_file)
+    G_posesource_laser = build_se3_transform([float(x) for x in extrinsics.split(' ')])
+    gps_poses = get_poses(args.gps_file, args.extrinsics_dir, G_posesource_laser, timestamps, origin_time)
+    gps_poses_np = np.array(gps_poses)
+    points = gps_poses_np[:, :3, 3]
+    pcd_tree = o3d.geometry.KDTreeFlann(points.transpose())
+    return pcd_tree, points, gps_poses
+
+
+def find_points_in_range(pgo_instance, timestamp, timestamp_id, radius=5):
+    gps = get_gps_position()
+    ids = get_neighbour_ids(gps)
+    pgo_instance.add_vertex()
+    for match_id in ids:
+        match_pose = get_gps_pose(match_id)
+        instance_pose = get_gps_pose(timestamp_id)
+        transformation = np.dot(inverse_transformation(match_pose, instance_pose))
+        optimized_transformation = icp(match_pose, instance_pose, transformation)
+        pgo_instance.add_edge([match_id, vertex], optimized_transformation)
+
+
+def get_timestamps(args, use_all=True, start_ts=None, end_ts=None, stride=None):
+    lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', args.laser_dir).group(0)
+    timestamps_path = os.path.join(args.laser_dir, os.pardir, lidar + '.timestamps')
+    if use_all:
+        timestamps = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)
+    else:
+        timestamps = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)[start_ts:end_ts][::stride]
+    timestamps = timestamps.tolist()
+    return timestamps
+
+
+def find_loop_closures(g2o, kd_tree, radius=5):
+    # returns a list of indices of matches that lie withing the radius
+    matches = []
+    for vertex_id, vertex in g2o.vertices().items():
+        pivot_point = g2o.vertex(vertex_id).estimate().matrix()[:3, 3]
+        [k, idx, _] = kd_tree.search_radius_vector_3d(np.expand_dims(pivot_point, axis=1), radius)
+        if idx:
+            if idx[0] is not vertex_id: # TODO: delete this test when using vo again
+                assert ("inedices do no match up")
+        for match_id in idx:
+            if match_id is not vertex_id and match_id is not vertex_id + 1 and match_id is not vertex_id - 1:
+                if (match_id, vertex_id) not in matches:
+                    matches.append((vertex_id, match_id))
+    return matches
+
+def add_optimized_loop_closures(point_clouds, pgo, list_of_loop_closures, gps_poses, timestamps):
+    for vertex_id, match_id in list_of_loop_closures:
+        target = point_clouds[vertex_id]
+        source = point_clouds[match_id]
+
+        # define entries for get_icp_transform
+        src_pcl = np.array(source.points)
+        dst_pcl = np.array(target.points)
+        src_pose = gps_poses[vertex_id]
+        dst_pose = gps_poses[match_id]
+        src_ts = timestamps[vertex_id]
+        dst_ts = timestamps[match_id]
+        tmat, cc, fitness = get_icp_transform(src_pcl, dst_pcl,
+                                              src_pose, dst_pose,
+                                              src_ts, dst_ts, verbose=False, max_icp_distance=5)
+        pgo.add_edge([match_id, vertex_id], tmat)
+    return pgo
+
 if __name__ == "__main__":
     down_sample_rate = 5
     display_result = True
