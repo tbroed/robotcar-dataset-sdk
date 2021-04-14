@@ -381,7 +381,14 @@ if __name__ == "__main__":
     if build_graph:
         # TODO: build_pose_graph()
         pgo = build_pose_graph(poses)
-        pgo.visualize_in_plt(threeDim=True)
+
+        # Build KD Tree and find loop closures
+        kd_tree, gps_points, gps_poses = build_KD_Tree(args, timestamps)
+        list_of_loop_closures = find_loop_closures(pgo, kd_tree)
+        print("loop closures", list_of_loop_closures)
+        pgo = add_optimized_loop_closures(point_clouds, pgo, list_of_loop_closures, gps_poses, timestamps)
+        # visualize before refinment
+        pgo.visualize_in_plt()
 
         # TODO: do_graph_optimization()
         print('Performing full BA:')
