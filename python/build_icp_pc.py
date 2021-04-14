@@ -360,10 +360,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if not load_poses:
         if not use_all_points:
-            point_clouds, poses = get_point_clouds(args, use_all=use_all_points, start_ts=start_ts, end_ts=end_ts,
-                                                   stride=stride)
+            timestamps = get_timestamps(args, use_all=use_all_points, start_ts=start_ts, end_ts=end_ts, stride=stride)
         else:
-            point_clouds, poses = get_point_clouds(args)
+            timestamps = get_timestamps(args)
+        point_clouds, poses = get_point_clouds(args, copy.deepcopy(timestamps))
         point_cloud = combine_point_clouds(point_clouds, poses)
 
         if save_result:
