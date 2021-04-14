@@ -395,4 +395,13 @@ if __name__ == "__main__":
         pgo.optimize(max_iterations=20)
         pgo.visualize_in_plt()
 
+        # visualize and save optimized point cloud
+        pgo_poses = []
+        for i in range(len(pgo.vertices())):
+            pgo_poses.append(pgo.vertex(i).estimate().matrix())
+        point_cloud = combine_point_clouds(point_clouds, pgo_poses)
+        if down_sample_rate > 0:
+            point_cloud = downsample_pcl(point_cloud, rate=down_sample_rate)
+        o3d.io.write_point_cloud("output/Point_Clouds/pc_g2o_stirde_5.ply", point_cloud)
+        display_single_pc(point_cloud)
     print("finished")
