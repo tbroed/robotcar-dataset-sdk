@@ -57,13 +57,17 @@ def filter_timestamps(list_of_timestamps, list_of_poses, threshold_in_m=1):
 def get_point_clouds(extrinsics_dir, poses_file, all_timestamps, stride=None):
     origin_time = int(all_timestamps[0])
     lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', args.laser_dir).group(0)
-    with open(os.path.join(args.extrinsics_dir, lidar + '.txt')) as extrinsics_file:
+    with open(os.path.join(extrinsics_dir, lidar + '.txt')) as extrinsics_file:
         extrinsics = next(extrinsics_file)
     G_posesource_laser = build_se3_transform([float(x) for x in extrinsics.split(' ')])
 
-    poses = get_poses(args.poses_file, args.extrinsics_dir, G_posesource_laser, timestamps, origin_time)
+    all_poses = get_poses(poses_file, extrinsics_dir, G_posesource_laser, all_timestamps, origin_time)
 
-    timestamps = timestamps[1:]  # delete the added (in get_poses and more down in the code) origin timestamp again
+    filtered_timestamps, filtered_poses = filter_timestamps(all_timestamps[1:], all_poses)  # delete the added (in get_poses and more down in the code) origin timestamp again
+
+    if stride is not None:
+        filtered_poses = filtered_poses[::stride]
+        filtered_timestamps = filtered_timestamps[::stride]
 
     point_clouds = []
     for i, timestamp in enumerate(timestamps):
