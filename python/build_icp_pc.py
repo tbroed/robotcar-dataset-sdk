@@ -80,10 +80,11 @@ def get_point_clouds(extrinsics_dir, poses_file, all_timestamps, stride=None):
             -np.ascontiguousarray(pc.transpose().astype(np.float64)))
         point_clouds.append(pcd)
 
-    optimized_relative_poses = optimize_with_icp(point_clouds, poses, timestamps)
+    print("ICP optimization with direct neighbours")
+    optimized_relative_poses = optimize_with_icp(point_clouds, filtered_poses, filtered_timestamps)
     optimized_absolute_poses = accumulate_poses(optimized_relative_poses)
 
-    return point_clouds, optimized_absolute_poses
+    return point_clouds, optimized_absolute_poses, filtered_timestamps
 
 
 def do_icp(source, target, trans_init, threshold=0.02, verbose=0):
