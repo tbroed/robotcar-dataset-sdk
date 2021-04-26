@@ -191,15 +191,15 @@ def get_poses(poses_file, extrinsics_dir, g_pose_source, timestamps, origin_time
             g_pose_source = np.linalg.solve(build_se3_transform([float(x) for x in extrinsics.split(' ')]),
                                             g_pose_source)
 
-        poses = interpolate_ins_poses(poses_file, timestamps, origin_time, use_rtk=(poses_type == 'rtk'))
+        poses_interpolated = interpolate_ins_poses(poses_file, timestamps, origin_time, use_rtk=(poses_type == 'rtk'))
     else:
         # sensor is VO, which is located at the main vehicle frame
-        poses = interpolate_vo_poses(poses_file, timestamps, origin_time)
-        # new_poses = []
-        # for pose in poses:
-        #     new_pose = np.dot(pose, G_posesource_laser)
-        #     new_poses.append(new_pose)
-    return poses
+        poses_interpolated = interpolate_vo_poses(poses_file, timestamps, origin_time)
+    # new_poses = [] # TODO:check if this is needed
+    # for pose in poses:
+    #     new_pose = np.dot(pose, g_pose_source)
+    #     new_poses.append(new_pose)
+    return poses_interpolated
 
 
 def draw_registration_result(source, target, transformation):
