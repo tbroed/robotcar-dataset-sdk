@@ -20,10 +20,10 @@ def open3d_icp(src_p, src_n, dst_p, dst_n, t_init, max_iter=1000, src_name='src'
     dst_open3d = _pcl_to_open3d(dst_p, dst_n)
 
     if point_to_point:
-        reg_res = o3d.registration.registration_icp(
+        reg_res = o3d.pipelines.registration.registration_icp(
             src_open3d, dst_open3d, max_icp_distance, t_init,
-            o3d.registration.TransformationEstimationPointToPoint(),
-            o3d.registration.ICPConvergenceCriteria(max_iteration=max_iter,
+            o3d.pipelines.registration.TransformationEstimationPointToPoint(),
+            o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=max_iter,
                                                     relative_rmse=relative_rmse,
                                                     relative_fitness=relative_fitness))
     else:
@@ -78,7 +78,7 @@ def open3d_ransac(src_p, src_n, dst_p, dst_n, src_name='src', dst_name='dst', vo
     t_final = reg_res.transformation
 
     if verbose:
-        print_tmat(t_final, 'ransac')
+        print('ransac', t_final)
         print(
             f'ransac: fitness: {round(reg_res.fitness, 3)}   inlier_rmse: {round(reg_res.inlier_rmse, 3)}   set: {np.asarray(reg_res.correspondence_set).shape[0]}')
 
