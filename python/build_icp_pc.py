@@ -341,10 +341,112 @@ def find_loop_closures(pgo_instance, kd_tree_instance, radius=5):
                     matches.append((vertex_id, match_id))
     return matches
 
-def add_optimized_loop_closures(point_clouds, pgo, list_of_loop_closures, gps_poses, timestamps):
-    for vertex_id, match_id in list_of_loop_closures:
-        target = point_clouds[vertex_id]
-        source = point_clouds[match_id]
+
+def add_optimized_loop_closures(loaded_point_clouds, pgo_instance, loop_closures, poses_gps, list_of_timestamps,
+                                vo_poses=None, do_ransac=False, rate=None, verbose=0):
+    for vertex_id, match_id in loop_closures:
+        target = loaded_point_clouds[vertex_id]
+        source = loaded_point_clouds[match_id]
+
+        if down_sample_rate is not None:
+            target = downsample_pcl(target, rate=rate)
+            source = downsample_pcl(source, rate=rate)
+
+        # ICP with gps as initial transform
+        src_pcl = copy.copy(np.array(source.points))
+        dst_pcl = copy.copy(np.array(target.points))
+        src_pose = poses_gps[vertex_id]
+        dst_pose = poses_gps[match_id]
+        src_ts = list_of_timestamps[vertex_id]
+        dst_ts = list_of_timestamps[match_id]
+        # trans = np.dot(inverse_transformation(dst_pose), src_pose)
+        tmat, cc, fitness = get_icp_transform(src_pcl, dst_pcl, src_pose, dst_pose, src_ts, dst_ts,
+                                              verbose=False, max_icp_distance=0.1,
+                                              tmp_folder='ICP_tmp/lp_gps')
+        tmat_gps = tmat
+        if verbose:
+            print("fitness gps: ", fitness)
+            # draw_registration_result(target, source, tmat)
+
+        # if gps result is not satisfying try to get a better transformation via RANSAC
+        if do_ransac and fitness < 0.5:
+            # TODO: use open3d_ransac() von Niclas
+            # todo: check o3d.pipelines.registration.CorrespondenceCheckerBasedOnNormal() as ransac method
+            # http://www.open3d.org/docs/release/tutorial/pipelines/global_registration.html
+            voxel_size = 0.5
+            source_down, source_fpfh = preprocess_point_cloud(source, voxel_size, verbose=verbose)
+            target_down, target_fpfh = preprocess_point_cloud(target, voxel_size, verbose=verbose)
+            result_ransac = execute_global_registration(source_down, target_down,
+                                                        source_fpfh, target_fpfh,
+                                                        voxel_size, verbose=verbose)
+            # TODO: test fast registration
+            # draw_registration_result(source_down, target_down, result_ransac.transformation)
+            # result_fast = execute_fast_global_registration(source_down, target_down,
+            #                                                source_fpfh, target_fpfh,
+            #                                                voxel_size)
+            # draw_registration_result(source_down, target_down, result_fast.transformation)
+            # print(result_ransac)
+            # draw_registration_result(source_down, target_down, result_ransac.transformation)
+            tmat_ransac, cc_ransac, fitness_ransac = get_icp_transform(src_pcl, dst_pcl, None, None, src_ts, dst_ts,
+                                                                       verbose=False, max_icp_distance=0.1,
+                                                                       tmat_init=result_ransac.transformation,
+                                                                       tmp_folder='ICP_tmp/lp_ransac')  # try 1, next 0.1 # add again: tmp_folder='ICP_tmp'
+            if verbose:
+                print("fitness ransac: ", fitness_ransac)
+                # draw_registration_result(target, source, np.linalg.inv(tmat_ransac))
+            r = R.from_matrix(np.dot(np.linalg.inv(tmat), tmat_ransac)[:3, :3])
+            if np.abs(np.sum(r.as_euler('zxy', degrees=True))) < 60:
+                # if fitness_ransac > fitness:
+                tmat = np.linalg.inv(tmat_ransac)
+                fitness = fitness_ransac
+                if verbose:
+                    print("ransac used")
+            else:
+                if verbose:
+                    print("ransac inverted -> skipped")
+
+        # Display final registration result
+        # draw_registration_result(target, source, tmat)
+
+        # Add edge to pose graph if a good fit was found
+        if fitness > 0.4:
+            # draw_registration_result(target, source, tmat)
+            pgo_instance.add_edge([match_id, vertex_id], tmat)  # TODO: robust_kernel=g2o.RobustKernelHuber()) # Testing kernal
+            if verbose:
+                print("-- edge added --")
+    return pgo_instance
+
+
+def execute_fast_global_registration(source_down, target_down, source_fpfh,
+                                     target_fpfh, voxel_size):
+    distance_threshold = voxel_size * 0.5
+    # print(":: Apply fast global registration with distance threshold %.3f" \
+    #       % distance_threshold)
+    result = o3d.pipelines.registration.registration_fast_based_on_feature_matching(
+        source_down, target_down, source_fpfh, target_fpfh,
+        o3d.pipelines.registration.FastGlobalRegistrationOption(
+            maximum_correspondence_distance=distance_threshold))
+    return result
+
+
+def execute_global_registration(source_down, target_down, source_fpfh,
+                                target_fpfh, voxel_size, verbose=0):
+    distance_threshold = voxel_size * 1.5
+    if verbose:
+        print(":: RANSAC registration on downsampled point clouds.")
+        print("   Since the downsampling voxel size is %.3f," % voxel_size)
+        print("   we use a liberal distance threshold %.3f." % distance_threshold)
+    result = o3d.pipelines.registration.registration_ransac_based_on_feature_matching(
+        source_down, target_down, source_fpfh, target_fpfh, True,
+        distance_threshold,
+        o3d.pipelines.registration.TransformationEstimationPointToPoint(False),
+        3, [
+            o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(
+                0.9),
+            o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(
+                distance_threshold)
+        ], o3d.pipelines.registration.RANSACConvergenceCriteria(100000, 0.999))
+    return result
 
         # define entries for get_icp_transform
         src_pcl = np.array(source.points)
