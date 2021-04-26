@@ -36,7 +36,9 @@ def get_icp_transform(src_pcl: np.ndarray, dst_pcl: np.ndarray,
                       max_icp_distance: float = 1,
                       tmat_init: Optional[np.ndarray] = None,
                       check_swap: bool = True,
-                      verbose: bool = False) -> Tuple[np.ndarray, np.ndarray, float]:
+                      verbose: bool = False,
+                      max_iter: int = 500,  # TODO: set max_iter=5000 again
+                      use_point_to_point: bool = False) -> Tuple[np.ndarray, np.ndarray, float]:
     # Avoid having two redundant files for 'src -> dst' and 'dst -> src'
     swap_src_dst = False if not check_swap else src_ts < dst_ts
     if swap_src_dst:
@@ -66,8 +68,9 @@ def get_icp_transform(src_pcl: np.ndarray, dst_pcl: np.ndarray,
         src_normals = compute_normals(src_pcl[:, :3])
         dst_normals = compute_normals(dst_pcl[:, :3])
         tmat, cc, fitness = open3d_icp(src_pcl[:, :3], src_normals, dst_pcl[:, :3], dst_normals, tmat_init,
-                                       max_iter=100, max_icp_distance=max_icp_distance, verbose=verbose,
-                                       src_name=str(src_ts / 1e6), dst_name=str(dst_ts / 1e6)) #TODO: set max_iter=5000 again
+                                       max_iter=max_iter, max_icp_distance=max_icp_distance, verbose=verbose,
+                                       src_name=str(src_ts / 1e6), dst_name=str(dst_ts / 1e6),
+                                       point_to_point=use_point_to_point)
 
     # Do not overwrite existing files
     if tmp_folder is not None and not load_from_disk:
