@@ -10,6 +10,7 @@ from interpolate_poses import interpolate_vo_poses, interpolate_ins_poses
 from velodyne import load_velodyne_raw, load_velodyne_binary, velodyne_raw_to_pointcloud
 import copy
 from numpy import linalg as LA
+from scipy.spatial.transform import Rotation as R
 
 
 def init_visualizer():
@@ -36,6 +37,21 @@ def accumulate_poses(relative_poses):
         previous_pose = absolute_pose
     return absolute_poses
 
+
+def filter_timestamps(list_of_timestamps, list_of_poses, threshold_in_m=1):
+    # only keep timestamps with poses 1m apart
+    filtered_timestamps = [list_of_timestamps[0]]
+    filtered_poses = [list_of_poses[0]]
+    for i in range(1, len(list_of_timestamps)):
+        r = np.array(list_of_poses[i][:3, 3] - filtered_poses[-1][:3, 3]).squeeze()
+        distance = np.sqrt(r.dot(r))
+        if distance > threshold_in_m:
+            filtered_timestamps.append(list_of_timestamps[i])
+            filtered_poses.append(list_of_poses[i])
+    # check if timestamps and poses are same length -> delete redundant first timestamp
+    if len(filtered_timestamps) != filtered_poses and filtered_timestamps[0] == filtered_timestamps[1]:
+        filtered_timestamps = filtered_timestamps[1:]
+    return filtered_timestamps, filtered_poses
 
 def get_point_clouds(args, timestamps):
     origin_time = int(timestamps[0])
