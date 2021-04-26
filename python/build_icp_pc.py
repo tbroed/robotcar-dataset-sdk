@@ -473,17 +473,13 @@ if __name__ == "__main__":
     down_sample_rate = 5
     display_result = True
     use_all_points = False
-    start_ts = 32750
-    end_ts = 33800
-    stride = 5
+    start_ts = 32450  # 22750 #32750
+    end_ts = 34100  # 30000 #33800
+    stride_pc = 5
     save_result = True
-    save_result_name = "output/Point_Clouds/pc_g2o_before_stirde_5.ply"
-    save_result_name_graph_optimized = "output/Point_Clouds/pc_g2o_stirde_5.ply"
+    save_result_name = "output/Point_Clouds/pc_g2o_before_TEST.ply"  # 22750_30000_5m.ply"#TEST.ply"#
+    save_result_name_graph_optimized = "output/Point_Clouds/pc_g2o_after_TEST.ply"  # 22750_30000_5m.ply"
     build_graph = True
-    save_poses = True
-    save_poses_name = 'test.npy'
-    load_poses = True
-    load_poses_name = 'poses_gps_circle_32750_33800_20.npy'
 
     parser = argparse.ArgumentParser(description='Build and display a pointcloud')
     parser.add_argument('--poses_file', type=str, default=None, help='File containing relative or absolute poses')
