@@ -336,6 +336,7 @@ def find_loop_closures(pgo_instance, kd_tree_instance, radius=5):
                 assert ("inedices do no match up")
         for match_id in idx:
             if np.abs((match_id-vertex_id)) > 20:
+                # only use matched that are not to close to each other (find "real" loop closures)
                 if (match_id, vertex_id) not in matches:
                     matches.append((vertex_id, match_id))
     return matches
