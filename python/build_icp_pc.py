@@ -53,8 +53,9 @@ def filter_timestamps(list_of_timestamps, list_of_poses, threshold_in_m=1):
         filtered_timestamps = filtered_timestamps[1:]
     return filtered_timestamps, filtered_poses
 
-def get_point_clouds(args, timestamps):
-    origin_time = int(timestamps[0])
+
+def get_point_clouds(extrinsics_dir, poses_file, all_timestamps, stride=None):
+    origin_time = int(all_timestamps[0])
     lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', args.laser_dir).group(0)
     with open(os.path.join(args.extrinsics_dir, lidar + '.txt')) as extrinsics_file:
         extrinsics = next(extrinsics_file)
