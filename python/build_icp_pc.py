@@ -63,7 +63,8 @@ def get_point_clouds(extrinsics_dir, poses_file, all_timestamps, stride=None):
 
     all_poses = get_poses(poses_file, extrinsics_dir, G_posesource_laser, all_timestamps, origin_time)
 
-    filtered_timestamps, filtered_poses = filter_timestamps(all_timestamps[1:], all_poses)  # delete the added (in get_poses and more down in the code) origin timestamp again
+    filtered_timestamps, filtered_poses = filter_timestamps(all_timestamps[1:],
+                                                            all_poses)  # delete the added (in get_poses and more down in the code) origin timestamp again
 
     if stride is not None:
         filtered_poses = filtered_poses[::stride]
