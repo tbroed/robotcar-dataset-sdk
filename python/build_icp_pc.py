@@ -325,14 +325,14 @@ def get_timestamps(laser_dir, use_all=True, start=None, end=None):
     return timestamps_list
 
 
-def find_loop_closures(g2o, kd_tree, radius=5):
+def find_loop_closures(pgo_instance, kd_tree_instance, radius=5):
     # returns a list of indices of matches that lie withing the radius
     matches = []
-    for vertex_id, vertex in g2o.vertices().items():
-        pivot_point = g2o.vertex(vertex_id).estimate().matrix()[:3, 3]
-        [k, idx, _] = kd_tree.search_radius_vector_3d(np.expand_dims(pivot_point, axis=1), radius)
+    for vertex_id, vertex in pgo_instance.vertices().items():
+        pivot_point = pgo_instance.vertex(vertex_id).estimate().matrix()[:3, 3]
+        [k, idx, _] = kd_tree_instance.search_radius_vector_3d(np.expand_dims(pivot_point, axis=1), radius)
         if idx:
-            if idx[0] is not vertex_id: # TODO: delete this test when using vo again
+            if idx[0] is not vertex_id:
                 assert ("inedices do no match up")
         for match_id in idx:
             if match_id is not vertex_id and match_id is not vertex_id + 1 and match_id is not vertex_id - 1:
