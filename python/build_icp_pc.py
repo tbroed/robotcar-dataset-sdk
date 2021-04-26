@@ -490,40 +490,36 @@ if __name__ == "__main__":
     parser.add_argument('--models_dir', type=str, help='Directory containing camera models')
     parser.add_argument('--gps_file', type=str, help='File containing gps poses')
     args = parser.parse_args()
-    if not load_poses:
-        if not use_all_points:
-            timestamps = get_timestamps(args, use_all=use_all_points, start_ts=start_ts, end_ts=end_ts, stride=stride)
-        else:
-            timestamps = get_timestamps(args)
-        point_clouds, poses = get_point_clouds(args, copy.deepcopy(timestamps))
-        point_cloud = combine_point_clouds(point_clouds, poses)
+    timestamps = get_timestamps(args.laser_dir, use_all=use_all_points, start_ts=start_ts, end_ts=end_ts)
+    # point_clouds, poses = get_point_clouds(args, copy.deepcopy(timestamps))
+    point_clouds, poses, timestamps = get_point_clouds(args.extrinsics_dir, args.poses_file, timestamps,
+                                                       stride=stride_pc)
+    point_cloud = combine_point_clouds(point_clouds, poses)
 
-        if save_result:
-            o3d.io.write_point_cloud(save_result_name, point_cloud)
-        if down_sample_rate > 0:
-            point_cloud = downsample_pcl(point_cloud, rate=down_sample_rate)
-        if display_result:
-            display_single_pc(point_cloud)
-        if save_poses:
-            poses_np = np.array(poses)
-            np.save(save_poses_name, poses_np)
-    else:
-        poses_np = np.load(load_poses_name)
-        poses = poses_np
+    if save_result:
+        o3d.io.write_point_cloud(save_result_name, point_cloud)
+    if down_sample_rate > 0:
+        point_cloud = downsample_pcl(point_cloud, rate=down_sample_rate)
+    if display_result:
+        display_single_pc(point_cloud)
     if build_graph:
         pgo = build_pose_graph(poses)
 
         # Build KD Tree and find loop closures
+        print("building KD Tree")
         kd_tree, gps_points, gps_poses = build_KD_Tree(args, timestamps)
-        list_of_loop_closures = find_loop_closures(pgo, kd_tree)
-        print("loop closures", list_of_loop_closures)
-        pgo = add_optimized_loop_closures(point_clouds, pgo, list_of_loop_closures, gps_poses, timestamps)
+        print("searching for loop closure candidates")
+        list_of_loop_closures = find_loop_closures(pgo, kd_tree, radius=5)
+        print("found ", len(list_of_loop_closures), " loop closures candidates")
+        print(list_of_loop_closures)
+        pgo = add_optimized_loop_closures(point_clouds, pgo, list_of_loop_closures, gps_poses, timestamps,
+                                          poses_vo=poses, do_ransac=True)
         # visualize before refinment
         pgo.visualize_in_plt()
 
         # Do graph optimization
         print('Performing full BA:')
-        pgo.optimize(max_iterations=20)
+        pgo.optimize(max_iterations=100)
         pgo.visualize_in_plt()
 
         if display_result or save_result:
