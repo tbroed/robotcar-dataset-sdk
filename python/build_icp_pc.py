@@ -314,15 +314,15 @@ def find_points_in_range(pgo_instance, timestamp, timestamp_id, radius=5):
         pgo_instance.add_edge([match_id, vertex], optimized_transformation)
 
 
-def get_timestamps(args, use_all=True, start_ts=None, end_ts=None, stride=None):
-    lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', args.laser_dir).group(0)
-    timestamps_path = os.path.join(args.laser_dir, os.pardir, lidar + '.timestamps')
+def get_timestamps(laser_dir, use_all=True, start=None, end=None):
+    lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', laser_dir).group(0)
+    timestamps_path = os.path.join(laser_dir, os.pardir, lidar + '.timestamps')
     if use_all:
-        timestamps = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)
+        timestamps_np = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)
     else:
-        timestamps = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)[start_ts:end_ts][::stride]
-    timestamps = timestamps.tolist()
-    return timestamps
+        timestamps_np = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)[start:end]
+    timestamps_list = timestamps_np.tolist()
+    return timestamps_list
 
 
 def find_loop_closures(g2o, kd_tree, radius=5):
