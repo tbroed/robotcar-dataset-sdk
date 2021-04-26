@@ -448,18 +448,26 @@ def execute_global_registration(source_down, target_down, source_fpfh,
         ], o3d.pipelines.registration.RANSACConvergenceCriteria(100000, 0.999))
     return result
 
-        # define entries for get_icp_transform
-        src_pcl = np.array(source.points)
-        dst_pcl = np.array(target.points)
-        src_pose = gps_poses[vertex_id]
-        dst_pose = gps_poses[match_id]
-        src_ts = timestamps[vertex_id]
-        dst_ts = timestamps[match_id]
-        tmat, cc, fitness = get_icp_transform(src_pcl, dst_pcl,
-                                              src_pose, dst_pose,
-                                              src_ts, dst_ts, verbose=False, max_icp_distance=5)
-        pgo.add_edge([match_id, vertex_id], tmat)
-    return pgo
+
+def preprocess_point_cloud(pcd, voxel_size, verbose=0):
+    if verbose:
+        print(":: Downsample with a voxel size %.3f." % voxel_size)
+    pcd_down = pcd.voxel_down_sample(voxel_size)
+
+    radius_normal = voxel_size * 2
+    if verbose:
+        print(":: Estimate normal with search radius %.3f." % radius_normal)
+    pcd_down.estimate_normals(
+        o3d.geometry.KDTreeSearchParamHybrid(radius=radius_normal, max_nn=30))
+
+    radius_feature = voxel_size * 5
+    if verbose:
+        print(":: Compute FPFH feature with search radius %.3f." % radius_feature)
+    pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(
+        pcd_down,
+        o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn=100))
+    return pcd_down, pcd_fpfh
+
 
 if __name__ == "__main__":
     down_sample_rate = 5
