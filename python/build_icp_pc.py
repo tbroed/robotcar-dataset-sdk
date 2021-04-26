@@ -70,7 +70,8 @@ def get_point_clouds(extrinsics_dir, poses_file, all_timestamps, stride=None):
         filtered_timestamps = filtered_timestamps[::stride]
 
     point_clouds = []
-    for i, timestamp in enumerate(timestamps):
+    print("collecting point clouds")
+    for i, timestamp in enumerate(filtered_timestamps):
         if i % 100 is 0:
             print("iteration: ", i)
         pc = get_single_pc(args.laser_dir, timestamp)
