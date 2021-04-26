@@ -177,7 +177,6 @@ def optimize_with_icp(point_clouds, poses_initial_guess, timestamps):
                                               src_pose, dst_pose,
                                               src_ts, dst_ts, verbose=False, max_icp_distance=0.1,
                                               tmp_folder='ICP_tmp/neighbours')
-        # TODO: save to file to accumulate later
         point_clouds_icp_optimized_poses.append(tmat)
     return point_clouds_icp_optimized_poses
 
