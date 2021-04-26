@@ -181,14 +181,14 @@ def optimize_with_icp(point_clouds, poses_initial_guess, timestamps):
     return point_clouds_icp_optimized_poses
 
 
-def get_poses(poses_file, extrinsics_dir, G_posesource_laser, timestamps, origin_time):
+def get_poses(poses_file, extrinsics_dir, g_pose_source, timestamps, origin_time):
     poses_type = re.search('(vo|ins|rtk|radar_odometry)\.csv', poses_file).group(1)
 
     if poses_type in ['ins', 'rtk']:
         with open(os.path.join(extrinsics_dir, 'ins.txt')) as extrinsics_file:
             extrinsics = next(extrinsics_file)
-            G_posesource_laser = np.linalg.solve(build_se3_transform([float(x) for x in extrinsics.split(' ')]),
-                                                 G_posesource_laser)
+            g_pose_source = np.linalg.solve(build_se3_transform([float(x) for x in extrinsics.split(' ')]),
+                                            g_pose_source)
 
         poses = interpolate_ins_poses(poses_file, timestamps, origin_time, use_rtk=(poses_type == 'rtk'))
     else:
