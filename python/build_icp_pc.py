@@ -411,56 +411,8 @@ def add_optimized_loop_closures(loaded_point_clouds, pgo_instance, loop_closures
     return pgo_instance
 
 
-def execute_fast_global_registration(source_down, target_down, source_fpfh,
-                                     target_fpfh, voxel_size):
-    distance_threshold = voxel_size * 0.5
-    # print(":: Apply fast global registration with distance threshold %.3f" \
-    #       % distance_threshold)
-    result = o3d.pipelines.registration.registration_fast_based_on_feature_matching(
-        source_down, target_down, source_fpfh, target_fpfh,
-        o3d.pipelines.registration.FastGlobalRegistrationOption(
-            maximum_correspondence_distance=distance_threshold))
-    return result
-
-
-def execute_global_registration(source_down, target_down, source_fpfh,
-                                target_fpfh, voxel_size, verbose=0):
-    distance_threshold = voxel_size * 1.5
-    if verbose:
-        print(":: RANSAC registration on downsampled point clouds.")
-        print("   Since the downsampling voxel size is %.3f," % voxel_size)
-        print("   we use a liberal distance threshold %.3f." % distance_threshold)
-    result = o3d.pipelines.registration.registration_ransac_based_on_feature_matching(
-        source_down, target_down, source_fpfh, target_fpfh, True,
-        distance_threshold,
-        o3d.pipelines.registration.TransformationEstimationPointToPoint(False),
-        3, [
-            o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(
-                0.9),
-            o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(
-                distance_threshold)
-        ], o3d.pipelines.registration.RANSACConvergenceCriteria(100000, 0.999))
-    return result
-
-
-def preprocess_point_cloud(pcd, voxel_size, verbose=0):
-    if verbose:
-        print(":: Downsample with a voxel size %.3f." % voxel_size)
-    pcd_down = pcd.voxel_down_sample(voxel_size)
-
-    radius_normal = voxel_size * 2
-    if verbose:
-        print(":: Estimate normal with search radius %.3f." % radius_normal)
-    pcd_down.estimate_normals(
-        o3d.geometry.KDTreeSearchParamHybrid(radius=radius_normal, max_nn=30))
-
-    radius_feature = voxel_size * 5
-    if verbose:
-        print(":: Compute FPFH feature with search radius %.3f." % radius_feature)
-    pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(
-        pcd_down,
-        o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn=100))
-    return pcd_down, pcd_fpfh
+def add_gps_anchors(point_clouds, pgo, list_of_loop_closures, gps_poses, timestamps, poses_vo, do_ransac):
+    pass
 
 
 if __name__ == "__main__":
