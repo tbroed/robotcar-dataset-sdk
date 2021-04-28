@@ -9,21 +9,18 @@ from python.files_mapping.open3d_helper import compute_normals, open3d_icp, open
 
 
 def get_initial_transform(src_pcl: np.ndarray, dst_pcl: np.ndarray,
-                          src_pose: np.ndarray, dst_pose: np.ndarray,
                           src_ts: int, dst_ts: int,
-                          voxel_size: float,
+                          voxel_size: float = 0.5,
                           verbose: bool = False):
     swap_src_dst = False if src_ts < dst_ts else True
     if swap_src_dst:
         src_ts, dst_ts = dst_ts, src_ts
         src_pcl, dst_pcl = dst_pcl, src_pcl
-        src_pose, dst_pose = dst_pose, src_pose
-
-    src_normals = compute_normals(src_pcl[:, :3])
-    dst_normals = compute_normals(dst_pcl[:, :3])
-    tmat, cc = open3d_ransac(src_pcl[:, :3], src_normals, dst_pcl[:, :3], dst_normals, voxel_size=voxel_size,
+    tmat, cc = open3d_ransac(src_pcl[:, :3], dst_pcl[:, :3], voxel_size=voxel_size,
                              verbose=verbose, src_name=str(src_ts / 1e6), dst_name=str(dst_ts / 1e6))
-
+    if swap_src_dst:
+        tmat = np.linalg.inv(tmat)
+        cc = np.fliplr(cc)
     return tmat, cc
 
 
