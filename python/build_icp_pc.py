@@ -353,12 +353,16 @@ def find_loop_closures(pgo_instance, kd_tree_instance, radius=5):
 
 
 def add_optimized_loop_closures(loaded_point_clouds, pgo_instance, loop_closures, poses_gps, list_of_timestamps,
-                                vo_poses=None, do_ransac=False, rate=None, verbose=0):
+                                fitness_threshold=0.4, do_ransac=False, rate=None, verbose=0):
     for vertex_id, match_id in loop_closures:
+        if verbose:
+            print('Checking for loop closure: %s to %s' % (list_of_timestamps[vertex_id] / 1e6,
+                                                           list_of_timestamps[match_id] / 1e6))
+
         target = loaded_point_clouds[vertex_id]
         source = loaded_point_clouds[match_id]
 
-        if down_sample_rate is not None:
+        if rate is not None:
             target = downsample_pcl(target, rate=rate)
             source = downsample_pcl(source, rate=rate)
 
@@ -369,61 +373,41 @@ def add_optimized_loop_closures(loaded_point_clouds, pgo_instance, loop_closures
         dst_pose = poses_gps[match_id]
         src_ts = list_of_timestamps[vertex_id]
         dst_ts = list_of_timestamps[match_id]
-        # trans = np.dot(inverse_transformation(dst_pose), src_pose)
         tmat, cc, fitness = get_icp_transform(src_pcl, dst_pcl, src_pose, dst_pose, src_ts, dst_ts,
                                               verbose=False, max_icp_distance=0.1,
                                               tmp_folder='ICP_tmp/lp_gps')
-        tmat_gps = tmat
         if verbose:
             print("fitness gps: ", fitness)
             # draw_registration_result(target, source, tmat)
 
         # if gps result is not satisfying try to get a better transformation via RANSAC
         if do_ransac and fitness < 0.5:
-            # TODO: use open3d_ransac() von Niclas
-            # todo: check o3d.pipelines.registration.CorrespondenceCheckerBasedOnNormal() as ransac method
-            # http://www.open3d.org/docs/release/tutorial/pipelines/global_registration.html
-            voxel_size = 0.5
-            source_down, source_fpfh = preprocess_point_cloud(source, voxel_size, verbose=verbose)
-            target_down, target_fpfh = preprocess_point_cloud(target, voxel_size, verbose=verbose)
-            result_ransac = execute_global_registration(source_down, target_down,
-                                                        source_fpfh, target_fpfh,
-                                                        voxel_size, verbose=verbose)
-            # TODO: test fast registration
-            # draw_registration_result(source_down, target_down, result_ransac.transformation)
-            # result_fast = execute_fast_global_registration(source_down, target_down,
-            #                                                source_fpfh, target_fpfh,
-            #                                                voxel_size)
-            # draw_registration_result(source_down, target_down, result_fast.transformation)
-            # print(result_ransac)
-            # draw_registration_result(source_down, target_down, result_ransac.transformation)
-            tmat_ransac, cc_ransac, fitness_ransac = get_icp_transform(src_pcl, dst_pcl, None, None, src_ts, dst_ts,
-                                                                       verbose=False, max_icp_distance=0.1,
-                                                                       tmat_init=result_ransac.transformation,
-                                                                       tmp_folder='ICP_tmp/lp_ransac')  # try 1, next 0.1 # add again: tmp_folder='ICP_tmp'
-            if verbose:
-                print("fitness ransac: ", fitness_ransac)
-                # draw_registration_result(target, source, np.linalg.inv(tmat_ransac))
+            tmat_init, _ = get_initial_transform(src_pcl, dst_pcl, src_ts, dst_ts, verbose=verbose)
+            tmat_ransac, _cc_ransac, fitness_ransac = get_icp_transform(src_pcl, dst_pcl, None, None, src_ts, dst_ts,
+                                                                        verbose=False, max_icp_distance=0.1,
+                                                                        tmat_init=tmat_init,
+                                                                        tmp_folder='ICP_tmp/lp_ransac')
+            print("fitness ransac: ", fitness_ransac) if verbose else None
+            # draw_registration_result(target, source, np.linalg.inv(tmat_ransac))
             r = R.from_matrix(np.dot(np.linalg.inv(tmat), tmat_ransac)[:3, :3])
             if np.abs(np.sum(r.as_euler('zxy', degrees=True))) < 60:
-                # if fitness_ransac > fitness:
-                tmat = np.linalg.inv(tmat_ransac)
-                fitness = fitness_ransac
-                if verbose:
-                    print("ransac used")
+                if fitness_ransac > fitness:
+                    tmat = np.linalg.inv(tmat_ransac)
+                    fitness = fitness_ransac
+                    print("ransac used") if verbose else None
+                else:
+                    print("ransac fitness lower than gps fitness -> skipped ") if verbose else None
             else:
-                if verbose:
-                    print("ransac inverted -> skipped")
-
-        # Display final registration result
-        # draw_registration_result(target, source, tmat)
+                print("ransac inverted -> skipped") if verbose else None
 
         # Add edge to pose graph if a good fit was found
-        if fitness > 0.4:
+        if fitness > fitness_threshold:
+            # Display final registration result
             # draw_registration_result(target, source, tmat)
-            pgo_instance.add_edge([match_id, vertex_id], tmat)  # TODO: robust_kernel=g2o.RobustKernelHuber()) # Testing kernal
-            if verbose:
-                print("-- edge added --")
+            pgo_instance.add_edge((match_id, vertex_id), tmat, information=fitness * np.eye(
+                6))
+            print("edge added between vertex ", src_ts, " and match ", dst_ts, "with fitness ",
+                  fitness)
     return pgo_instance
 
 
