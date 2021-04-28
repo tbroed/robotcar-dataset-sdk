@@ -416,50 +416,40 @@ def add_gps_anchors(point_clouds, pgo, list_of_loop_closures, gps_poses, timesta
 
 
 if __name__ == "__main__":
-    down_sample_rate = 5
-    display_result = True
-    use_all_points = False
-    start_ts = 32450  # 22750 #32750
-    end_ts = 34100  # 30000 #33800
-    stride_pc = 5
-    save_result = True
-    save_result_name = "output/Point_Clouds/pc_g2o_before_TEST.ply"  # 22750_30000_5m.ply"#TEST.ply"#
-    save_result_name_graph_optimized = "output/Point_Clouds/pc_g2o_after_TEST.ply"  # 22750_30000_5m.ply"
-    build_graph = True
-
-    parser = argparse.ArgumentParser(description='Build and display a pointcloud')
-    parser.add_argument('--poses_file', type=str, default=None, help='File containing relative or absolute poses')
-    parser.add_argument('--laser_dir', type=str, default=None, help='Directory containing LIDAR data')
-    parser.add_argument('--extrinsics_dir', type=str, default=None,
-                        help='Directory containing extrinsic calibrations')
-    parser.add_argument('--image_dir', type=str, help='Directory containing images')
-    parser.add_argument('--models_dir', type=str, help='Directory containing camera models')
-    parser.add_argument('--gps_file', type=str, help='File containing gps poses')
+    parser = argparse.ArgumentParser(description='Build and display a pointcloud map')
+    parser.add_argument('--config_path', type=str, help='Yaml file containing configurations')
     args = parser.parse_args()
-    timestamps = get_timestamps(args.laser_dir, use_all=use_all_points, start_ts=start_ts, end_ts=end_ts)
-    # point_clouds, poses = get_point_clouds(args, copy.deepcopy(timestamps))
-    point_clouds, poses, timestamps = get_point_clouds(args.extrinsics_dir, args.poses_file, timestamps,
-                                                       stride=stride_pc)
+
+    config = yaml.safe_load(open(args.config_path, 'r'))
+    display_down_sample_rate = config['data']['display_down_sample_rate']
+    display_result = config['data']['display_result']
+
+    timestamps = get_timestamps(config, use_all=config['data']['use_all_points'])
+    point_clouds, poses, timestamps, icp_fitness = get_point_clouds(config['setup'], timestamps,
+                                                                    stride=config['data']['stride_pc'])
     point_cloud = combine_point_clouds(point_clouds, poses)
 
-    if save_result:
-        o3d.io.write_point_cloud(save_result_name, point_cloud)
-    if down_sample_rate > 0:
-        point_cloud = downsample_pcl(point_cloud, rate=down_sample_rate)
+    if config['data']['save_result']:
+        o3d.io.write_point_cloud(config['data']['save_result_name'], point_cloud)
+    if display_down_sample_rate > 0:
+        point_cloud = downsample_pcl(point_cloud, rate=display_down_sample_rate)
     if display_result:
         display_single_pc(point_cloud)
-    if build_graph:
-        pgo = build_pose_graph(poses)
+    if config['data']['build_graph']:
+        pgo = build_pose_graph(poses, icp_fitness)
 
         # Build KD Tree and find loop closures
         print("building KD Tree")
-        kd_tree, gps_points, gps_poses = build_KD_Tree(args, timestamps)
+        kd_tree, gps_points, gps_poses = build_KD_Tree(config['setup'], timestamps)
         print("searching for loop closure candidates")
         list_of_loop_closures = find_loop_closures(pgo, kd_tree, radius=5)
         print("found ", len(list_of_loop_closures), " loop closures candidates")
         print(list_of_loop_closures)
+        if config['data']['add_anchors']:
+            pgo = add_gps_anchors(point_clouds, pgo, list_of_loop_closures, gps_poses, timestamps,
+                                  poses_vo=poses, do_ransac=True)
         pgo = add_optimized_loop_closures(point_clouds, pgo, list_of_loop_closures, gps_poses, timestamps,
-                                          poses_vo=poses, do_ransac=True)
+                                          do_ransac=True)
         # visualize before refinment
         pgo.visualize_in_plt()
 
@@ -468,16 +458,16 @@ if __name__ == "__main__":
         pgo.optimize(max_iterations=100)
         pgo.visualize_in_plt()
 
-        if display_result or save_result:
+        if display_result or config['data']['save_result']:
             # visualize and save optimized point cloud
             pgo_poses = []
             for i in range(len(pgo.vertices())):
                 pgo_poses.append(pgo.vertex(i).estimate().matrix())
             point_cloud = combine_point_clouds(point_clouds, pgo_poses)
-            if down_sample_rate > 0:
-                point_cloud = downsample_pcl(point_cloud, rate=down_sample_rate)
-            if save_result:
-                o3d.io.write_point_cloud(save_result_name_graph_optimized, point_cloud)
+            if display_down_sample_rate > 0:
+                point_cloud = downsample_pcl(point_cloud, rate=display_down_sample_rate)
+            if config['data']['save_result']:
+                o3d.io.write_point_cloud(config['data']['save_result_name_graph_optimized'], point_cloud)
             if display_result:
                 display_single_pc(point_cloud)
     print("finished")
