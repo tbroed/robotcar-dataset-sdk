@@ -291,7 +291,7 @@ def downsample_pcl(pcl, rate):
     return pcl
 
 
-def build_KD_Tree(args, timestamps):
+def build_KD_Tree(config_setup, timestamps, two_dim=True):
     origin_time = int(timestamps[0])
     lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', config_setup['laser_dir']).group(0)
     with open(os.path.join(config_setup['extrinsics_dir'], lidar + '.txt')) as extrinsics_file:
@@ -300,8 +300,12 @@ def build_KD_Tree(args, timestamps):
     gps_poses = get_poses(config_setup['gps_file'], config_setup['extrinsics_dir'], G_posesource_laser, timestamps,
                           origin_time)
     gps_poses_np = np.array(gps_poses)
-    points = gps_poses_np[:, :3, 3]
-    pcd_tree = o3d.geometry.KDTreeFlann(points.transpose())
+    if two_dim:
+        points = gps_poses_np[:, [0, 1], 3]
+        pcd_tree = o3d.geometry.KDTreeFlann(points.transpose())
+    else:
+        points = gps_poses_np[:, :3, 3]
+        pcd_tree = o3d.geometry.KDTreeFlann(points.transpose())
     return pcd_tree, points, gps_poses
 
 
