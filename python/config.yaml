@@ -1,0 +1,20 @@
+setup:
+    poses_file: '/home/timbr/zuluk_scratch_second/datasets/OxfordRadarRobotCar/data/2019-01-11-12-26-55-radar-oxford-10k/gt/radar_odometry.csv'
+    laser_dir: '/home/timbr/zuluk_scratch_second/datasets/OxfordRadarRobotCar/data/2019-01-11-12-26-55-radar-oxford-10k/velodyne_left'
+    extrinsics_dir: '/home/timbr/zuluk_scratch_second/datasets/OxfordRadarRobotCar/extrinsics'
+    image_dir: '/home/timbr/zuluk_scratch_second/datasets/OxfordRadarRobotCar/data/2019-01-11-12-26-55-radar-oxford-10k/stereo/left'
+    models_dir: '/home/timbr/zuluk_scratch_second/datasets/OxfordRadarRobotCar/models'
+    gps_file: '/home/timbr/zuluk_scratch_second/datasets/OxfordRadarRobotCar/data/2019-01-11-12-26-55-radar-oxford-10k/gps/ins.csv'
+
+data:
+    display_down_sample_rate: 5
+    display_result: False
+    use_all_points: False
+    start_ts: 32450  # 32450  # 22750 #32750
+    end_ts: 34100  # 34100  # 30000 #33800
+    stride_pc: 5
+    save_result: True
+    save_result_name: 'output/Point_Clouds/pc_g2o_before_TEST.ply'  # 22750_30000_5m.ply"#TEST.ply"#
+    save_result_name_graph_optimized: 'output/Point_Clouds/pc_g2o_after_TEST.ply'  # 22750_30000_5m.ply"
+    build_graph: True
+    add_anchors: False
