@@ -340,12 +340,12 @@ def find_loop_closures(pgo_instance, kd_tree_instance, radius=5):
     matches = []
     for vertex_id, vertex in pgo_instance.vertices().items():
         pivot_point = pgo_instance.vertex(vertex_id).estimate().matrix()[:3, 3]
-        [k, idx, _] = kd_tree_instance.search_radius_vector_3d(np.expand_dims(pivot_point, axis=1), radius)
+        [k, idx, _] = kd_tree_instance.search_radius_vector_xd(np.expand_dims(pivot_point[[0, 1]], axis=1), radius)
         if idx:
             if idx[0] is not vertex_id:
-                assert ("inedices do no match up")
+                assert "indices do no match up"
         for match_id in idx:
-            if np.abs((match_id-vertex_id)) > 20:
+            if np.abs((match_id - vertex_id)) > 20:
                 # only use matched that are not to close to each other (find "real" loop closures)
                 if (match_id, vertex_id) not in matches:
                     matches.append((vertex_id, match_id))
