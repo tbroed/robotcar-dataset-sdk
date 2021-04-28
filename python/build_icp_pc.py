@@ -3,7 +3,8 @@ import argparse
 import os
 import re
 import numpy as np
-from python.files_mapping.icp import get_icp_transform
+import yaml
+from python.files_mapping.icp import get_icp_transform, get_initial_transform
 from python.files_mapping.pose_graph_optimization import PoseGraphOptimization
 from transform import build_se3_transform
 from interpolate_poses import interpolate_vo_poses, interpolate_ins_poses
@@ -54,14 +55,15 @@ def filter_timestamps(list_of_timestamps, list_of_poses, threshold_in_m=1):
     return filtered_timestamps, filtered_poses
 
 
-def get_point_clouds(extrinsics_dir, poses_file, all_timestamps, stride=None):
+def get_point_clouds(config_setup, all_timestamps, stride=None):
     origin_time = int(all_timestamps[0])
-    lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', args.laser_dir).group(0)
-    with open(os.path.join(extrinsics_dir, lidar + '.txt')) as extrinsics_file:
+    lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', config_setup['laser_dir']).group(0)
+    with open(os.path.join(config_setup['extrinsics_dir'], lidar + '.txt')) as extrinsics_file:
         extrinsics = next(extrinsics_file)
     G_posesource_laser = build_se3_transform([float(x) for x in extrinsics.split(' ')])
 
-    all_poses = get_poses(poses_file, extrinsics_dir, G_posesource_laser, all_timestamps, origin_time)
+    all_poses = get_poses(config_setup['poses_file'], config_setup['extrinsics_dir'], G_posesource_laser,
+                          all_timestamps, origin_time)
 
     filtered_timestamps, filtered_poses = filter_timestamps(all_timestamps[1:],
                                                             all_poses)  # delete the added (in get_poses and more down in the code) origin timestamp again
@@ -75,17 +77,17 @@ def get_point_clouds(extrinsics_dir, poses_file, all_timestamps, stride=None):
     for i, timestamp in enumerate(filtered_timestamps):
         if i % 100 is 0:
             print("iteration: ", i)
-        pc = get_single_pc(args.laser_dir, timestamp)
+        pc = get_single_pc(config_setup['laser_dir'], timestamp)
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(
             -np.ascontiguousarray(pc.transpose().astype(np.float64)))
         point_clouds.append(pcd)
 
     print("ICP optimization with direct neighbours")
-    optimized_relative_poses = optimize_with_icp(point_clouds, filtered_poses, filtered_timestamps)
+    optimized_relative_poses, icp_fitness = optimize_with_icp(point_clouds, filtered_poses, filtered_timestamps)
     optimized_absolute_poses = accumulate_poses(optimized_relative_poses)
 
-    return point_clouds, optimized_absolute_poses, filtered_timestamps
+    return point_clouds, optimized_absolute_poses, filtered_timestamps, icp_fitness
 
 
 def do_icp(source, target, trans_init, threshold=0.02, verbose=0):
@@ -161,6 +163,7 @@ def get_single_pc(lidar_dir, start_time):
 
 def optimize_with_icp(point_clouds, poses_initial_guess, timestamps):
     point_clouds_icp_optimized_poses = [np.identity(4)]
+    icp_fitness = [1]
     for i in range(1, len(point_clouds)):
         if i % 100 is 0:
             print("icp iteration: ", i)
@@ -179,7 +182,8 @@ def optimize_with_icp(point_clouds, poses_initial_guess, timestamps):
                                               src_ts, dst_ts, verbose=False, max_icp_distance=0.1,
                                               tmp_folder='ICP_tmp/neighbours')
         point_clouds_icp_optimized_poses.append(tmat)
-    return point_clouds_icp_optimized_poses
+        icp_fitness.append(fitness)
+    return point_clouds_icp_optimized_poses, icp_fitness
 
 
 def get_poses(poses_file, extrinsics_dir, g_pose_source, timestamps, origin_time):
@@ -258,7 +262,7 @@ def combine_point_clouds(point_clouds, poses):
     return combined_pcd
 
 
-def build_pose_graph(poses):
+def build_pose_graph(poses, icp_fitness):
     pgo = PoseGraphOptimization()
     for i, pose in enumerate(poses):
         if i is 0:
@@ -266,9 +270,7 @@ def build_pose_graph(poses):
         else:
             pgo.add_vertex(i, pose)
             relative_pose = np.dot(inverse_transformation(poses[i - 1]), poses[i])
-            pgo.add_edge([i - 1, i], relative_pose)
-        last = i
-    # pgo.add_edge([last, 0], np.identity(4)) # forces a closure at the end
+            pgo.add_edge((i - 1, i), relative_pose, information=icp_fitness[i] * np.eye(6))
     return pgo
 
 
@@ -291,11 +293,12 @@ def downsample_pcl(pcl, rate):
 
 def build_KD_Tree(args, timestamps):
     origin_time = int(timestamps[0])
-    lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', args.laser_dir).group(0)
-    with open(os.path.join(args.extrinsics_dir, lidar + '.txt')) as extrinsics_file:
+    lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', config_setup['laser_dir']).group(0)
+    with open(os.path.join(config_setup['extrinsics_dir'], lidar + '.txt')) as extrinsics_file:
         extrinsics = next(extrinsics_file)
     G_posesource_laser = build_se3_transform([float(x) for x in extrinsics.split(' ')])
-    gps_poses = get_poses(args.gps_file, args.extrinsics_dir, G_posesource_laser, timestamps, origin_time)
+    gps_poses = get_poses(config_setup['gps_file'], config_setup['extrinsics_dir'], G_posesource_laser, timestamps,
+                          origin_time)
     gps_poses_np = np.array(gps_poses)
     points = gps_poses_np[:, :3, 3]
     pcd_tree = o3d.geometry.KDTreeFlann(points.transpose())
@@ -314,12 +317,15 @@ def find_points_in_range(pgo_instance, timestamp, timestamp_id, radius=5):
         pgo_instance.add_edge([match_id, vertex], optimized_transformation)
 
 
-def get_timestamps(laser_dir, use_all=True, start=None, end=None):
+def get_timestamps(configurations, use_all=True):
+    laser_dir = configurations['setup']['laser_dir']
     lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', laser_dir).group(0)
     timestamps_path = os.path.join(laser_dir, os.pardir, lidar + '.timestamps')
     if use_all:
         timestamps_np = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)
     else:
+        start = configurations['data']['start_ts']
+        end = configurations['data']['end_ts']
         timestamps_np = np.loadtxt(timestamps_path, delimiter=' ', usecols=[0], dtype=np.int64)[start:end]
     timestamps_list = timestamps_np.tolist()
     return timestamps_list
