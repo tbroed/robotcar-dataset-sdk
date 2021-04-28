@@ -40,7 +40,7 @@ class PoseGraphOptimization(g2o.SparseOptimizer):
         super().add_vertex(v_point)
 
     def add_edge(self, vertices, measurement, information=np.eye(6), robust_kernel=None):
-        # self.edge_vertices.add(vertices) # TODO: was soll das bringen?
+        self.edge_vertices.add(vertices)
 
         edge = g2o.EdgeSE3()
         for i, v in enumerate(vertices):
