@@ -59,21 +59,32 @@ def open3d_icp(src_p, src_n, dst_p, dst_n, t_init, max_iter=1000, src_name='src'
     return t_final, cc, reg_res.fitness
 
 
-def open3d_ransac(src_p, src_n, dst_p, dst_n, src_name='src', dst_name='dst', voxel_size=.25, verbose=False):
+def open3d_ransac(src_p, dst_p, src_name='src', dst_name='dst', voxel_size=.25, verbose=False,
+                  use_fast_matching=False):
     if verbose:
         print('RANSAC: %s to %s' % (src_name, dst_name))
 
-    src_open3d = _pcl_to_open3d(src_p, src_n)
-    dst_open3d = _pcl_to_open3d(dst_p, dst_n)
+    src_open3d = _pcl_to_open3d(src_p)
+    dst_open3d = _pcl_to_open3d(dst_p)
 
     src_down, src_fpfh = _preprocess_point_cloud(src_open3d, voxel_size)
     dst_down, dst_fpfh = _preprocess_point_cloud(dst_open3d, voxel_size)
-    distance_threshold = .5 * voxel_size
-
-    reg_res = o3d.pipelines.registration.registration_fast_based_on_feature_matching(
-        src_down, dst_down, src_fpfh, dst_fpfh,
-        o3d.pipelines.registration.FastGlobalRegistrationOption(
-            maximum_correspondence_distance=distance_threshold))
+    if use_fast_matching:
+        distance_threshold = 1.5 * voxel_size
+        reg_res = o3d.pipelines.registration.registration_fast_based_on_feature_matching(
+            src_down, dst_down, src_fpfh, dst_fpfh,
+            o3d.pipelines.registration.FastGlobalRegistrationOption(
+                maximum_correspondence_distance=distance_threshold))
+    else:
+        distance_threshold = voxel_size * 1.5
+        reg_res = o3d.pipelines.registration.registration_ransac_based_on_feature_matching(
+            src_down, dst_down, src_fpfh, dst_fpfh, True,
+            distance_threshold,
+            o3d.pipelines.registration.TransformationEstimationPointToPoint(False),
+            3,
+            [o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(0.9),
+             o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(distance_threshold)],
+            o3d.pipelines.registration.RANSACConvergenceCriteria(100000, 0.999))
 
     t_final = reg_res.transformation
 
