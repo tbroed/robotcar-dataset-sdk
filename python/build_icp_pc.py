@@ -39,14 +39,17 @@ def accumulate_poses(relative_poses):
     return absolute_poses
 
 
-def filter_timestamps(list_of_timestamps, list_of_poses, threshold_in_m=1):
+def filter_timestamps(list_of_timestamps, list_of_poses, loop_closure_ts, threshold_in_m=1):
     # only keep timestamps with poses 1m apart
     filtered_timestamps = [list_of_timestamps[0]]
     filtered_poses = [list_of_poses[0]]
     for i in range(1, len(list_of_timestamps)):
         r = np.array(list_of_poses[i][:3, 3] - filtered_poses[-1][:3, 3]).squeeze()
         distance = np.sqrt(r.dot(r))
-        if distance > threshold_in_m:
+        if list_of_timestamps[i] in loop_closure_ts:
+            filtered_timestamps.append(list_of_timestamps[i])
+            filtered_poses.append(list_of_poses[i])
+        elif distance > threshold_in_m:
             filtered_timestamps.append(list_of_timestamps[i])
             filtered_poses.append(list_of_poses[i])
     # check if timestamps and poses are same length -> delete redundant first timestamp
@@ -55,7 +58,7 @@ def filter_timestamps(list_of_timestamps, list_of_poses, threshold_in_m=1):
     return filtered_timestamps, filtered_poses
 
 
-def get_point_clouds(config_setup, all_timestamps, stride=None):
+def get_point_clouds(config_setup, all_timestamps, lcts, stride=None):
     origin_time = int(all_timestamps[0])
     lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', config_setup['laser_dir']).group(0)
     with open(os.path.join(config_setup['extrinsics_dir'], lidar + '.txt')) as extrinsics_file:
@@ -66,7 +69,7 @@ def get_point_clouds(config_setup, all_timestamps, stride=None):
                           all_timestamps, origin_time)
 
     filtered_timestamps, filtered_poses = filter_timestamps(all_timestamps[1:],
-                                                            all_poses)  # delete the added (in get_poses and more down in the code) origin timestamp again
+                                                            all_poses, lcts)  # delete the added (in get_poses and more down in the code) origin timestamp again
 
     if stride is not None:
         filtered_poses = filtered_poses[::stride]
