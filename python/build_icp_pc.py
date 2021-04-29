@@ -297,14 +297,15 @@ def downsample_pcl(pcl, rate):
     return pcl
 
 
-def build_KD_Tree(config_setup, timestamps, two_dim=True):
-    origin_time = int(timestamps[0])
+def build_KD_Tree(config_setup, list_of_timestamps, two_dim=True):
+    origin_time = int(list_of_timestamps[0])
     lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', config_setup['laser_dir']).group(0)
     with open(os.path.join(config_setup['extrinsics_dir'], lidar + '.txt')) as extrinsics_file:
         extrinsics = next(extrinsics_file)
     G_posesource_laser = build_se3_transform([float(x) for x in extrinsics.split(' ')])
-    gps_poses = get_poses(config_setup['gps_file'], config_setup['extrinsics_dir'], G_posesource_laser, timestamps,
-                          origin_time)
+    gps_poses = get_poses(config_setup['gps_file'], config_setup['extrinsics_dir'], G_posesource_laser,
+                          list_of_timestamps, origin_time)
+    list_of_timestamps = list_of_timestamps[1:]
     gps_poses_np = np.array(gps_poses)
     if two_dim:
         points = gps_poses_np[:, [0, 1], 3]
@@ -312,7 +313,7 @@ def build_KD_Tree(config_setup, timestamps, two_dim=True):
     else:
         points = gps_poses_np[:, :3, 3]
         pcd_tree = o3d.geometry.KDTreeFlann(points.transpose())
-    return pcd_tree, points, gps_poses
+    return pcd_tree, points, gps_poses, list_of_timestamps
 
 
 def find_points_in_range(pgo_instance, timestamp, timestamp_id, radius=5):
