@@ -380,6 +380,7 @@ def add_optimized_loop_closures(loaded_point_clouds, pgo_instance, loop_closures
         dst_pose = poses_gps[match_id]
         src_ts = list_of_timestamps[vertex_id]
         dst_ts = list_of_timestamps[match_id]
+        tmat_orig = np.linalg.inv(dst_pose) @ src_pose
         tmat, cc, fitness = get_icp_transform(src_pcl, dst_pcl, src_pose, dst_pose, src_ts, dst_ts,
                                               verbose=False, max_icp_distance=0.1,
                                               tmp_folder='ICP_tmp/lp_gps')
@@ -396,7 +397,7 @@ def add_optimized_loop_closures(loaded_point_clouds, pgo_instance, loop_closures
                                                                         tmp_folder='ICP_tmp/lp_ransac')
             print("fitness ransac: ", fitness_ransac) if verbose else None
             # draw_registration_result(target, source, np.linalg.inv(tmat_ransac))
-            r = R.from_matrix(np.dot(np.linalg.inv(tmat), tmat_ransac)[:3, :3])
+            r = R.from_matrix(np.dot(tmat_orig, tmat_ransac)[:3, :3])
             if np.abs(np.sum(r.as_euler('zxy', degrees=True))) < 60:
                 if fitness_ransac > fitness:
                     tmat = np.linalg.inv(tmat_ransac)
