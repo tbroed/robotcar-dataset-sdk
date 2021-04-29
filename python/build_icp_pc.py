@@ -423,6 +423,34 @@ def add_gps_anchors(point_clouds, pgo, list_of_loop_closures, gps_poses, timesta
     pass
 
 
+def load_known_lc(loaded_point_clouds, loop_closures, pgo_instance, list_of_timestamps, verbose=False):
+    for vertex_id, match_id in loop_closures:
+        if verbose:
+            print('Checking for loop closure: %s to %s' % (list_of_timestamps[vertex_id] / 1e6,
+                                                           list_of_timestamps[match_id] / 1e6))
+        target = loaded_point_clouds[vertex_id]
+        source = loaded_point_clouds[match_id]
+        src_pcl = copy.copy(np.array(source.points))
+        dst_pcl = copy.copy(np.array(target.points))
+        src_ts = list_of_timestamps[vertex_id]
+        dst_ts = list_of_timestamps[match_id]
+
+        # if gps result is not satisfying try to get a better transformation via RANSAC
+        tmat_loaded, _, fitness_loaded = get_icp_transform(src_pcl, dst_pcl, None, None, src_ts, dst_ts,
+                                                                    verbose=False, max_icp_distance=0.1,
+                                                                    tmp_folder='ICP_tmp/lp_ransac_test')
+        print("fitness loaded: ", fitness_loaded) if verbose else None
+        # draw_registration_result(target, source, np.linalg.inv(tmat_ransac))
+        tmat = np.linalg.inv(tmat_loaded)
+
+        draw_registration_result(target, source, tmat)
+        pgo_instance.add_edge((match_id, vertex_id), tmat, information=fitness_loaded * np.eye(
+            6))
+        print("edge added between vertex ", src_ts, " and match ", dst_ts, "with fitness ",
+              fitness_loaded)
+    return pgo_instance
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Build and display a pointcloud map')
     parser.add_argument('--config_path', type=str, help='Yaml file containing configurations')
