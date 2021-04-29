@@ -461,7 +461,14 @@ if __name__ == "__main__":
     display_result = config['data']['display_result']
 
     timestamps = get_timestamps(config, use_all=config['data']['use_all_points'])
-    point_clouds, poses, timestamps, icp_fitness = get_point_clouds(config['setup'], timestamps,
+    # timestamps_1 = np.loadtxt('input/filtered_velodyne_left_1.timestamps', delimiter=' ', usecols=[0], dtype=np.int64).tolist()
+    # timestamps_2 = np.loadtxt('input/filtered_velodyne_left_2.timestamps', delimiter=' ', usecols=[0], dtype=np.int64).tolist()
+    # timestamps = timestamps_1 + timestamps_2
+
+    timestamps_loop_closures = np.loadtxt('input/loop_closures.timestamps', delimiter=' ', dtype=np.int64)
+    lpts_set = set(timestamps_loop_closures.reshape((-1,)))
+
+    point_clouds, poses, timestamps, icp_fitness = get_point_clouds(config['setup'], timestamps, lpts_set,
                                                                     stride=config['data']['stride_pc'])
     point_cloud = combine_point_clouds(point_clouds, poses)
 
@@ -474,18 +481,73 @@ if __name__ == "__main__":
     if config['data']['build_graph']:
         pgo = build_pose_graph(poses, icp_fitness)
 
-        # Build KD Tree and find loop closures
-        print("building KD Tree")
-        kd_tree, gps_points, gps_poses = build_KD_Tree(config['setup'], timestamps)
-        print("searching for loop closure candidates")
-        list_of_loop_closures = find_loop_closures(pgo, kd_tree, radius=5)
-        print("found ", len(list_of_loop_closures), " loop closures candidates")
-        print(list_of_loop_closures)
-        if config['data']['add_anchors']:
-            pgo = add_gps_anchors(point_clouds, pgo, list_of_loop_closures, gps_poses, timestamps,
-                                  poses_vo=poses, do_ransac=True)
-        pgo = add_optimized_loop_closures(point_clouds, pgo, list_of_loop_closures, gps_poses, timestamps,
-                                          do_ransac=True)
+        # # Build KD Tree and find loop closures
+        # print("building KD Tree")
+        # kd_tree, gps_points, gps_poses, timestamps = build_KD_Tree(config['setup'], timestamps)
+        # print("searching for loop closure candidates")
+        # list_of_loop_closures = find_loop_closures(pgo, kd_tree, radius=5)
+        # print("found ", len(list_of_loop_closures), " loop closures candidates")
+        # print(list_of_loop_closures)
+        # pgo = add_optimized_loop_closures(point_clouds, pgo, list_of_loop_closures, gps_poses, timestamps,
+        #                                                                     do_ransac=True, verbose=False)
+
+
+        # lidar = re.search('(lms_front|lms_rear|ldmrs|velodyne_left|velodyne_right)', config['setup']['laser_dir']).group(0)
+        # with open(os.path.join(config['setup']['extrinsics_dir'], lidar + '.txt')) as extrinsics_file:
+        #     extrinsics = next(extrinsics_file)
+        # G_posesource_laser = build_se3_transform([float(x) for x in extrinsics.split(' ')])
+        # gps_poses = get_poses(config['setup']['gps_file'], config['setup']['extrinsics_dir'], G_posesource_laser, timestamps, int(timestamps[0]))
+        # timestamps_loop_closures = np.loadtxt('input/loop_closures.timestamps', delimiter=' ', dtype=np.int64)
+        # timestamps = timestamps[1:] # TODO: check if this is ok and if i used the timestemps after build_KD_Tree wrong
+        # list_of_loop_closures_idx = []
+        # timestamps_set = set(timestamps)
+        # for k in range(timestamps_loop_closures.shape[0]):
+        #     # only add loops where an index is available
+        #     if timestamps_loop_closures[k, 0] in timestamps_set and timestamps_loop_closures[k,1] in timestamps_set:
+        #         vertex_id = timestamps.index(timestamps_loop_closures[k, 0]) # TODO: find "correct" timestamps
+        #         match_id = timestamps.index(timestamps_loop_closures[k, 1])
+        #         list_of_loop_closures_idx.append((vertex_id, match_id))
+        #     else:  # find closesed
+        #         min_diff = 9999999999
+        #         idx = -1
+        #         for j, timestamp in enumerate(timestamps):
+        #             diff = np.abs(timestamps_loop_closures[k, 0] - timestamp)
+        #             if diff < min_diff:
+        #                 min_diff = diff
+        #                 idx = j
+        #         vertex_id = idx
+        #         min_diff = 9999999999
+        #         idx = -1
+        #         for j, timestamp in enumerate(timestamps):
+        #             diff = np.abs(timestamps_loop_closures[k, 1] - timestamp)
+        #             if diff < min_diff:
+        #                 min_diff = diff
+        #                 idx = j
+        #         match_id = idx
+        #         list_of_loop_closures_idx.append((vertex_id, match_id))
+        # print("found ", len(list_of_loop_closures_idx), " loop closures candidates")
+        # print(list_of_loop_closures_idx)
+        # pgo = add_optimized_loop_closures(point_clouds, pgo, list_of_loop_closures_idx, gps_poses, timestamps,
+        #                                   do_ransac=True, verbose=1)
+
+
+        timestamps_set = set(timestamps)
+        list_of_loop_closures_idx = []
+        for k in range(timestamps_loop_closures.shape[0]):
+            # only add loops where an index is available
+            if timestamps_loop_closures[k, 0] in timestamps_set and timestamps_loop_closures[k, 1] in timestamps_set:
+                vertex_id = timestamps.index(timestamps_loop_closures[k, 0])  # TODO: find "correct" timestamps
+                match_id = timestamps.index(timestamps_loop_closures[k, 1])
+                list_of_loop_closures_idx.append((vertex_id, match_id))
+        print("found ", len(list_of_loop_closures_idx), " loop closures candidates")
+        print(list_of_loop_closures_idx)
+        load_known_lc(point_clouds, list_of_loop_closures_idx, pgo, timestamps, verbose=1)
+
+
+        # if config['data']['add_anchors']:
+        #     pgo = add_gps_anchors(point_clouds, pgo, list_of_loop_closures, gps_poses, timestamps,
+        #                           poses_vo=poses, do_ransac=True)
+
         # visualize before refinment
         pgo.visualize_in_plt()
 
