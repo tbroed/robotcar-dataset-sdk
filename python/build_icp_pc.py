@@ -273,7 +273,10 @@ def build_pose_graph(poses, icp_fitness):
         else:
             pgo.add_vertex(i, pose)
             relative_pose = np.dot(inverse_transformation(poses[i - 1]), poses[i])
-            pgo.add_edge((i - 1, i), relative_pose, information=icp_fitness[i] * np.eye(6))
+            if np.linalg.norm(relative_pose[:3,3]) <= 30:
+                pgo.add_edge((i - 1, i), relative_pose, information=icp_fitness[i] * np.eye(6))
+            else:
+                print("no edge added at ", i)
     return pgo
 
 
